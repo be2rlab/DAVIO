@@ -180,42 +180,10 @@
   </div>
 </header>
 
-<section>
-  <div class="wrap">
-    <p class="eyebrow">In short</p>
-    <h2>A visual–inertial filter that starts sooner and maps densely, without slowing down.</h2>
-    <p class="lead">DAVIO runs an unmodified OpenVINS filter with Depth Anything 3 at both ends
-      of it. At start-up the depth model gives the filter a metric, gravity-aligned state before
-      there is any parallax; during tracking the filter's poses condition the same model, so
-      the dense map it predicts is metric. The mapper never writes into the filter, so it can
-      never block a pose.</p>
-    <div class="cards">
-      <div class="card">
-        <div class="figure">2.3 s <small>vs 4.7 s</small></div>
-        <h3>Starts before parallax</h3>
-        <p>A five-image window and preintegrated IMU form a feature-free linear system:
-          median time to a usable state in the EuRoC machine hall, at comparable success.</p>
-      </div>
-      <div class="card">
-        <div class="figure">0.07–0.10 m <small>from 0.19–0.28</small></div>
-        <h3>A metric dense map, online</h3>
-        <p>Mean surface error on five building-scale ORI sequences, once the filter's own poses
-          condition the depth model.</p>
-      </div>
-      <div class="card">
-        <div class="figure">20.7 → 10.9 cm</div>
-        <h3>Loop closure without the filter</h3>
-        <p>A gravity-preserving submap graph closes loops in the map frame only. On ORI r01 an
-          offline re-map closes 10 loops and halves the trajectory error.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
 <section id="maps">
   <div class="wrap">
     <p class="eyebrow">Interactive</p>
-    <h2>The maps, in your browser</h2>
+    <h2>The maps, interactive</h2>
     <p class="lead">Each is the run's own fused output, thinned for the browser. Drag to orbit,
       scroll to zoom, right-drag to pan. The tube is the trajectory, blue at the start to red at
       the end.</p>
@@ -289,39 +257,6 @@
       <li><b>A graph beside the filter.</b> Submaps are refined by overlap and verified loop
         closures, and the result is a map-frame correction — never a state written back.</li>
     </ul>
-  </div>
-</section>
-
-<section id="results">
-  <div class="wrap">
-    <p class="eyebrow">Results</p>
-    <h2>The runs shown above</h2>
-    <table>
-      <thead><tr><th>Sequence</th><th>Trajectory</th><th class="num">ATE</th>
-        <th class="num">Submaps</th><th class="num">Loops</th></tr></thead>
-      <tbody id="numbers"><tr><td colspan="5">loading…</td></tr></tbody>
-    </table>
-    <p class="note">ATE against each dataset's own reference. <em>Online</em> is the live filter
-      stream; <em>re-mapped</em> is the same run pushed through the back-end again offline, where
-      loop closures are free to move the map frame. The phone walk has no reference, so no
-      number — which is the honest answer. The paper has the full tables.</p>
-  </div>
-</section>
-
-<section id="start">
-  <div class="wrap">
-    <p class="eyebrow">Get started</p>
-    <h2>From a clone to a map</h2>
-    <p class="lead">Linux, Docker and an NVIDIA GPU; everything else is built into an image.</p>
-<pre><span class="c"># once: images, OpenVINS, model weights</span>
-git clone --recursive https://github.com/be2rlab/DAVIO.git && cd DAVIO
-make setup
-
-<span class="c"># EuRoC, ORI, or your own recording</span>
-make euroc && ./davio run V1_01_easy
-./davio view runs/V1_01_easy</pre>
-    <p class="note">The <a href="https://github.com/be2rlab/DAVIO#readme">README</a> covers ORI,
-      your own data and evaluation.</p>
   </div>
 </section>
 
