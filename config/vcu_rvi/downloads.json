@@ -1,0 +1,29 @@
+{
+  "source_page": "https://vcu-rvi-dataset.github.io/2020/08/14/Dataset-Download/",
+  "source_folder": "https://drive.google.com/drive/folders/1yO10ty1IbC9aInYz7wdauiFoKlnjZCsc",
+  "note": "The per-file links printed on the source page are DEAD (HTTP 404 on every Drive endpoint, checked 2026-09-16): the release was reorganised into per-sequence subfolders and the old share ids were not carried over. The ids below were read from the live shared folder by traversing it, and are the ones that actually resolve. The shared folder itself still returns 200.",
+  "checked": "2026-09-16",
+  "calibration": {
+    "calibration.yaml": "1ko4Sprn6OjVP6rBtHZN-JKnsGAj9SJpW",
+    "struct_core_v2.yaml": "1SIbWLNHClGoVx9jqYrXeL16gOGts7I6w"
+  },
+  "sequences": {
+    "hall3": {
+      "page_name": "handheld-hall-03",
+      "bag": "1Sx31z2pi9YpH7EcNPkK20FWC8JDzLniw",
+      "groundtruth": "14GHWSTOiaw9rXXBRK8i736MPKeZAK445",
+      "bag_bytes": 17500000000
+    },
+    "corridor3": {
+      "page_name": "handheld-corridor-03",
+      "bag": "1AqZHVUGzj2JWzODlPZqfrNtU8ZlwGR8Q",
+      "groundtruth": "1Ee8hpOkD3O6n15YKfjOZLe4IGH7DCCuw",
+      "bag_bytes": 10900000000
+    },
+    "hall1": {"page_name": "handheld-hall-01", "bag": "1JFf0IfvEguF0UxWAD9OcRu7uzXsgNBJc", "groundtruth": "1wuFAY2PsniygVtIDS76Q0I7krbCBOvLq"},
+    "hall2": {"page_name": "handheld-hall-02", "bag": "1xTPx5YPq3_OTElGYr2XrPxPXHIFlzVps", "groundtruth": "1dKmVaGojTX5b5v2UJpSR0cmWEVxgYEXK"},
+    "corridor1": {"page_name": "handheld-corridor-01", "bag": "1pkrtJTn-WcHFvsmmlVfg-mxv7aTY3A7h", "groundtruth": "1Ley6MZNsfHNu3A90CrPkalnqf4tQ1hoN"},
+    "corridor2": {"page_name": "handheld-corridor-02", "bag": "1PzYpdYPXcwUGrlK7AZ24_ws1_MZuo61d", "groundtruth": "19gS0Yukj1qC8A1ALDTYSOaPRJQm8j8qw"},
+    "corridor4": {"page_name": "handheld-corridor-04", "bag": "1CFCJSY6Fgw2vqPeNTLXq34-dv18CMGAm", "groundtruth": "1ckA3LcrkgWeGBLNkkBJkcQQBpFWFvLkJ"}
+  }
+}

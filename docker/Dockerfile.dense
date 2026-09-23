@@ -1,0 +1,4 @@
+ARG BASE=davio/standalone-gpu:latest
+FROM ${BASE}
+RUN python3 -m pip install --no-cache-dir kornia==0.8.2
+ENV OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=2

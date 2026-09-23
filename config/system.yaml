@@ -1,0 +1,179 @@
+model: depth-anything/DA3-BASE
+device: cuda
+process_res: 504
+torch_threads: 2
+max_tracking_gap_s: 2.0
+shutdown_drain_s: 3.0
+selected_queue_timeout_s: 2.0
+diagnostics_period_s: 1.0
+openvins:
+  configs:
+    euroc: config/euroc/estimator_config.yaml
+    tumvi: config/tumvi/estimator_config.yaml
+    ori: config/ori/estimator_config.yaml
+    realsense: config/realsense/estimator_config.yaml
+    vcu_rvi: config/vcu_rvi/estimator_config.yaml
+    phone: config/phone/estimator_config.yaml
+    custom: config/phone/estimator_config.yaml
+  overrides:
+    verbosity: WARNING
+    calib_cam_extrinsics: true
+    calib_cam_intrinsics: false
+    calib_cam_timeoffset: false
+    init_window_time: 2.0
+    init_dyn_use: true
+    init_dyn_mle_opt_calib: true
+    init_dyn_mle_max_threads: 2
+    init_dyn_mle_max_iter: 20
+    init_dyn_mle_max_time: 0.05
+    init_dyn_num_pose: 5
+    init_dyn_min_deg: 15.0
+    init_dyn_bias_g: [0.0, 0.0, 0.0]
+    init_dyn_bias_a: [0.0, 0.0, 0.0]
+calibration:
+  mode: supplied
+  lever_arm_prior_m: 0.05     # sigma of the p_CinI prior in the feed-forward initializer
+  rectifier_refresh_px: 2.0   # free mode: rebuild the DA3 rectifier when the filter's K/D move a corner by more
+  priors:                     # initial calibration sigmas written into the assisted filter config (free modes)
+    rotation_deg: 15.0     # hand-eye start measured 6-11 deg on M1 seed 0 (v1 shadow study: 3-12 deg); 3 deg diverged on MH_01
+    translation_m: 0.10
+    focal_px: 20.0
+    distortion: 0.1
+    time_offset_s: 0.02
+assistance:
+  enabled: true
+  solver: joint
+  validate: true
+  native_priority: true
+  budget_s: 30.0           # free modes need several windows of rotation before a hand-eye release
+  window_frames: 5
+  sample_period_s: 0.2 
+  feedforward: true
+  legacy_rotation_proposal: false
+  ff:                       # init/feedforward.py default_config keys
+    points_per_frame: 100
+    conf_quantile: 0.25
+    ransac_iterations: 100
+    ransac_threshold: 0.01
+    min_inlier_fraction: 0.4
+    min_frames_covered: 3
+    max_median_error: 0.05
+    estimate_lever_arm: false   # held at the prior (zero): measured 0.2-3.9 m when free; the filter calibrates it
+  attempt_period_s: 0.2
+  max_windows: 10          # the joint solve re-preintegrates every window per LM trial; 10 keeps a release under ~1 s
+  imu_history_s: 10.0
+  history_frames: 160      # 8 s at 20 Hz: must cover the oldest admissible candidate (max_candidate_age_s) plus its window
+  shadow_queue_frames: 20
+  candidate_preroll_s: null
+  shadow_continuous: false
+  shadow_period_s: 2.0
+  max_candidate_age_s: 5.0
+  candidate_timeout_s: 3.0
+  max_attempts: 5
+  max_catchup_lag_s: 0.15
+  warm_frames: 5
+  max_bias_norm_rad_s: 0.3
+  joint_max_iterations: 40  # LM iterations of the joint hand-eye/bias solve (v1: 15)
+  pair_angle_tol_rad_free: 0.1   # hand-eye pair angle-agreement gate in free mode (rectified default 0.05)
+  validation_rms_deg_free: 3.0
+  validation_max_deg_free: 8.0
+  validation_rms_deg: 1.0
+  validation_max_deg: 3.0
+  gates:
+    joint_min_axis_coverage: 0.02
+    joint_min_sigma_x_given_b: 1.0e-6
+    joint_min_sigma_bb: 1.0e-6
+    joint_min_pairs: 3
+mapping:
+  enabled: true
+  window_frames: 5
+  max_task_age_s: 2.0
+  keyframe_period_s: 0.5
+  max_active_submaps: 24        # resident DENSE geometry only; pose nodes are kept
+  max_graph_nodes: 5000         # hard bound on the back-end; older nodes freeze
+  min_baseline_m: 0.05
+  max_alignment_rmse_m: 0.15
+  voxel_m: 0.04
+  pixel_step: 4
+  da3_pose_conditioning: true
+  da3_conditioned_max_log_scale: 0.3
+  frame_scale_refinement: true
+  frame_scale_absolute: false
+  frame_scale_abs_prior_sigma: 0.1
+  frame_scale_pairs: 2            # match frame i with i+1 .. i+pairs
+  frame_scale_min_matches: 30
+  frame_scale_prior_sigma: 1.0    # weak prior s_i = 1 so an unmatched frame is left alone
+  frame_scale_cut: 3.0            # rows beyond this many robust sigmas are dropped
+  frame_scale_rounds: 8
+  shared_frame_scale: true
+  depth_filter: true
+  depth_min_m: 0.15
+  depth_max_m: 20.0
+  depth_conf_quantile: 0.2
+  depth_edge_relative: 0.15
+  depth_consistency_relative: 0.10
+  depth_min_support: 1
+  export_every_submaps: 1
+  correction_nodes: 1
+  correction_jump_m: 0.05
+  correction_jump_deg: 2.0
+  correction_ramp_s: 1.0
+  graph_iterations: 8          # only runs when a loop disagrees with the odometry chain
+  loops_enabled: true
+  feature_backend: xfeat_lighterglue
+  xfeat_mnn_min_cossim: 0.82     # xfeat_mnn backend and appearance retrieval threshold
+  xfeat_path: thirdparty/accelerated_features
+  xfeat_features: 2048
+  sparse_alignment: true
+  sparse_adjacent: true    # adjacent-submap point factors; loops-only ablation turns this off
+  adjacent_factor: point   # point (N 3D residuals) or pose (rigid PnP control)
+  sparse_max_points: 80
+  sparse_sigma_m: 0.10            # isotropic floor on a matched 3D correspondence
+  sparse_sigma_radial: 0.10
+  sparse_sigma_lateral: 0.01
+  overlap_frames: 2
+  orb_features: 1000
+  max_loop_candidates: 4
+  # spatial | appearance | union; which retrieval proposed a loop is recorded per loop.
+  loop_retrieval: spatial
+  loop_retrieval_budget: 512
+  loop_retrieval_min_mnn: 25
+  loop_min_separation_s: 5.0
+  loop_search_radius_m: 8.0     # spatial gate, not a recency window; states the search scope
+  loop_min_matches: 50
+  loop_min_inliers: 30
+  loop_min_inlier_ratio: 0.25
+  loop_reprojection_px: 2.0
+  loop_depth_relative_error: 0.2
+  loop_max_rotation_deg: 30.0    # absolute ceiling; the normalized gate below usually binds
+  loop_max_translation_m: 3.0
+  loop_max_innovation_sigma: 3.0
+  loop_min_drift_ratio: 1.0
+  # False-loop robustness probe (E7). 0 disables; every N submaps one coherent wrong loop.
+  inject_false_loop_every: 0
+  inject_false_loop_rotation_deg: 10.0
+  inject_false_loop_translation_m: 1.0
+  inject_seed: 0
+  odometry_sigma_floor_m: 0.02
+  odometry_sigma_floor_deg: 0.5
+  odometry_drift_m_per_m: 0.005
+  odometry_drift_deg_per_m: 0.5
+  loop_sigma_m: 0.25
+  loop_sigma_deg: 5.0
+  loop_scale_relative_error: 0.10
+  scale_coupling: true
+  graph_nodes: gravity
+  scale_anchors: true             # per-node log-scale prior to the window fit (E4 arm 7 drops it)
+  overlap_scale_factors: true     # relative depth-scale observations from overlaps (E4 arm 8 drops them)
+  # C3 selective geometry-to-pose admission (negative result; E4 control only).
+  selective_admission: false
+  admission_min_information: 1.0
+  admission_max_condition: 1.0e4
+  admission_heldout_max: 2.0
+  admission_drift_sigma: 3.0
+  admission_confirm_m: 0.05
+  admission_confirm_deg: 2.0
+  scale_prior_sigma_log: 0.10      # trust in one window's own baseline fit
+  scale_sigma_log: 0.03            # trust in an overlap relative-scale measurement
+  scale_max_relative_error: 0.5    # widest depth disagreement still usable as a measurement
+  scale_overlap_min_points: 200    # fewest overlapping samples that make a measurement

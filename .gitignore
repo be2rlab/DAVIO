@@ -1,0 +1,18 @@
+# Build products
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+native/build/
+.pytest_cache/
+
+thirdparty/da3_weights/
+thirdparty/accelerated_features/
+
+# Inputs and outputs: datasets are fetched into data/, runs and renders are produced.
+# data/
+runs/
+renders/
+config/custom/
+*.rrd
+data/*

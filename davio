@@ -1,0 +1,361 @@
+#!/usr/bin/env python3
+"""DAVIO command line."""
+import argparse
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parent
+IMAGE = os.environ.get('DAVIO_IMAGE', 'davio/dense-gpu:latest')
+DATASETS = ('euroc', 'ori', 'custom', 'tumvi', 'vcu_rvi', 'realsense', 'phone')
+# No reference trajectory ships with these, so there is nothing to score against.
+UNSCORED = ('custom', 'phone', 'realsense')
+
+
+def inside_container():
+    return Path('/.dockerenv').exists() or os.environ.get('DAVIO_IN_CONTAINER') == '1'
+
+
+def containerized(argv, camera=False):
+    """Run argv in the image, or directly when this is already the image."""
+    if inside_container():
+        return subprocess.call(argv, cwd=ROOT)
+    if shutil.which('docker') is None:
+        print('docker is not installed, and this command needs the DAVIO image.\n'
+              'See docs/SETUP.md, or run the script directly if your host has CUDA, ROS 2 '
+              'and the openvins_ext binding.', file=sys.stderr)
+        return 127
+    env = dict(os.environ)
+    if camera:
+        env.setdefault('DAVIO_IMAGE', 'davio/realsense:latest')
+        env['DAVIO_REALSENSE'] = '1'
+    return subprocess.call([str(ROOT / 'scripts/docker.sh')] + argv, cwd=ROOT, env=env)
+
+
+def on_host(argv):
+    return subprocess.call(argv, cwd=ROOT)
+
+
+def inside_repo(path):
+    """`path` relative to the checkout, or None when the container could not see it."""
+    resolved = (ROOT / path).resolve() if not Path(path).is_absolute() else Path(path).resolve()
+    try:
+        return str(resolved.relative_to(ROOT))
+    except ValueError:
+        return None
+
+
+# ------------------------------------------------------------------------- doctor
+def doctor(_a, _rest):
+    """Report what is present and what each missing piece blocks, then exit non-zero if broken."""
+    checks = []
+
+    def check(name, ok, detail, blocks, optional=False):
+        checks.append((name, bool(ok), detail, blocks, optional))
+
+    docker = shutil.which('docker')
+    check('docker', docker, docker or 'not on PATH', 'every command that needs CUDA')
+    if docker:
+        found = subprocess.run(['docker', 'image', 'inspect', IMAGE], capture_output=True,
+                               text=True).returncode == 0
+        check(f'image {IMAGE}', found,
+              'present' if found else 'missing: build it with `make image`',
+              'running and mapping')
+    gpu = shutil.which('nvidia-smi')
+    if gpu:
+        name = subprocess.run(['nvidia-smi', '--query-gpu=name,memory.total',
+                               '--format=csv,noheader'], capture_output=True, text=True)
+        check('gpu', name.returncode == 0, name.stdout.strip() or 'nvidia-smi failed',
+              'dense mapping (DA3)')
+    else:
+        check('gpu', False, 'nvidia-smi not found', 'dense mapping (DA3)')
+    binding = next(ROOT.glob('src/openvins_ext*.so'), None)
+    check('openvins_ext binding', binding, str(binding.name) if binding else
+          'missing: run `make openvins && make shim`', 'every run; the tests do not need it')
+    weights = ROOT / 'thirdparty/da3_weights/base/model.safetensors'
+    check('DA3 checkpoint', weights.is_file(),
+          'thirdparty/da3_weights/base' if weights.is_file() else 'missing: run `make weights`',
+          'dense mapping')
+    xfeat = ROOT / 'thirdparty/accelerated_features/weights/xfeat.pt'
+    check('XFeat weights', xfeat.is_file(),
+          'present' if xfeat.is_file() else 'missing: run `make xfeat`',
+          'loop closure and frame-scale refinement')
+
+    def sequences(dataset, marker):
+        folder = ROOT / 'data' / dataset
+        return sorted(p.name for p in folder.glob('*') if (p / marker).exists()) \
+            if folder.is_dir() else []
+
+    euroc, ori = sequences('euroc', 'mav0'), sequences('ori', 'davio')
+    check('EuRoC data', euroc, ', '.join(euroc) if euroc else 'none: run `make euroc`',
+          'EuRoC runs', optional=True)
+    check('ORI data', ori, ', '.join(ori) if ori else 'none: run `make ori`',
+          'ORI runs', optional=True)
+    rig = ROOT / 'config/realsense/kalibr_imucam_chain.yaml'
+    check('RealSense rig', rig.is_file(), 'generated' if rig.is_file() else
+          'not generated: plug a camera in and run `./davio calibrate`',
+          '`./davio camera` only', optional=True)
+
+    width = max(len(n) for n, _o, _d, _b, _x in checks)
+    broken = [c for c in checks if not c[1] and not c[4]]
+    for name, ok, detail, blocks, optional in checks:
+        mark = 'ok  ' if ok else ('--  ' if optional else 'MISS')
+        print(f'  {mark}  {name:<{width}}  {detail}')
+        if not ok:
+            print(f'        {"":<{width}}  blocks: {blocks}')
+    if broken:
+        print(f'\n{len(broken)} required piece(s) missing; see docs/SETUP.md.')
+        return 1
+    print(f'\nReady. ({sum(not c[1] for c in checks)} optional piece(s) not set up.)'
+          if any(not c[1] for c in checks) else '\nReady.')
+    return 0
+
+
+# ------------------------------------------------------------------------- commands
+def cmd_test(_a, rest):
+    return containerized(['python3', '-m', 'pytest', '-q', 'tests'] + rest)
+
+
+def cmd_run(a, rest):
+    out = a.out or f'runs/{a.sequence}'
+    if Path(ROOT / out).exists():
+        print(f'{out} already exists; pass --out to name a new run directory.', file=sys.stderr)
+        return 2
+    data = inside_repo(a.data or f'data/{a.dataset}')
+    if data is None:
+        print(f'{a.data} is outside this checkout, and the container only sees the checkout. '
+              'Move or link the data under data/.', file=sys.stderr)
+        return 2
+    argv = ['python3', 'scripts/run_davio.py', '--dataset', a.dataset,
+            '--data', data, '--sequence', a.sequence,
+            '--rate', str(a.rate), '--out', out]
+    if a.dataset in ('custom', 'phone') and '--rig' not in rest:
+        rig = ROOT / 'config/custom' / a.sequence / 'estimator_config.yaml'
+        if not rig.is_file():
+            print(f'no rig for {a.sequence!r}: write one first with '
+                  f'`./davio rig {data}/{a.sequence}`, or pass --rig.', file=sys.stderr)
+            return 2
+        argv += ['--rig', str(rig.relative_to(ROOT))]
+    weights = ROOT / 'thirdparty/da3_weights/base'
+    if weights.is_dir():
+        argv += ['--weights', 'thirdparty/da3_weights/base']
+    if a.seconds:
+        argv += ['--seconds', str(a.seconds)]
+    argv += rest
+    code = containerized(argv)
+    if code:
+        return code
+    if a.dataset not in UNSCORED:
+        containerized(['python3', 'scripts/evaluate_run.py', '--run', out, '--data', data])
+    print(f'\nView it with:  ./davio view {out}')
+    return 0
+
+
+def cmd_evaluate(a, rest):
+    """Score a run against its dataset's reference, reading where the data was from the run."""
+    run = Path(a.run.rstrip('/'))
+    meta = json.loads((ROOT / run / 'run.json').read_text())
+    if meta.get('dataset') in UNSCORED:
+        print(f'{run}: a {meta["dataset"]} run has no reference trajectory to score against.',
+              file=sys.stderr)
+        return 2
+    data = a.data
+    if data is None:
+        root = meta['data_root']
+        data = root[len('/workspace/'):] if root.startswith('/workspace/') else root
+    replay = ROOT / run / 'replay.json'
+    if replay.is_file():
+        report = json.loads(replay.read_text())
+        print(json.dumps({k: report.get(k) for k in (
+            'ate_raw_m', 'ate_map_final_m', 'accepted_loops', 'submaps_mapped',
+            'residual_scale_median')}, indent=2))
+        code = 0
+    else:
+        code = containerized(['python3', 'scripts/evaluate_run.py', '--run', str(run),
+                              '--data', data] + rest)
+    if a.surface and code == 0:
+        if not (ROOT / run / 'map.ply').is_file():
+            code = containerized(['python3', 'scripts/export_map.py', '--map', f'{run}/map',
+                                  '--out', f'{run}/map.ply'])
+        if code == 0:
+            code = containerized(['python3', 'scripts/evaluate_surface.py', '--run', str(run),
+                                  '--data', data] + rest)
+    return code
+
+
+def cmd_rig(a, rest):
+    """The OpenVINS rig for your own recording, from the calibration beside it."""
+    session = Path(a.session.rstrip('/'))
+    out = a.out or f'config/custom/{session.name}'
+    return on_host([sys.executable, 'scripts/phone_rig.py', '--session', str(session),
+                    '--out', out] + rest)
+
+
+def cmd_view(a, rest):
+    # The viewer is pure Python plus rerun; prefer the host so the browser and the
+    # desktop viewer work without port plumbing, and fall back to the image.
+    argv = [sys.executable, 'scripts/view_run.py', '--run', a.run] + rest
+    try:
+        import rerun  # noqa: F401
+        return on_host(argv)
+    except ImportError:
+        return containerized(['python3', 'scripts/view_run.py', '--run', a.run] + rest)
+
+
+def cmd_map(a, rest):
+    """Offline back-end: the same submaps a run archived, mapped again without a clock."""
+    out = a.out or f'{a.run.rstrip("/")}_remap'
+    argv = ['python3', 'scripts/replay_map.py', '--source', a.run, '--out', out]
+    if '--no-keep-dense' in rest:
+        rest = [r for r in rest if r != '--no-keep-dense']
+    else:
+        argv.append('--keep-dense')
+    return containerized(argv + rest)
+
+
+def cmd_export(a, rest):
+    out = a.out or f'{a.run.rstrip("/")}/map.ply'
+    return containerized(['python3', 'scripts/export_map.py', '--map', f'{a.run.rstrip("/")}/map',
+                          '--out', out] + rest)
+
+
+def cmd_render(a, rest):
+    """Presentation renders. Host-side: Open3D needs a graphics stack the image has not got."""
+    out = a.out or f'renders/{Path(a.run.rstrip("/")).name}'
+    if a.build:
+        return on_host([sys.executable, 'scripts/render_build.py', '--run', a.run,
+                        '--out', out, '--camera', a.build] + rest)
+    ply = Path(ROOT / a.run.rstrip('/') / 'map.ply')
+    if not ply.is_file():
+        print(f'{ply} does not exist yet; run `./davio export {a.run}` first.', file=sys.stderr)
+        return 2
+    return on_host([sys.executable, 'scripts/render_map.py', '--run', a.run,
+                    '--out', out] + rest)
+
+
+def cmd_compose(a, rest):
+    """Camera frames beside a build video. Host-side, like render: it only needs OpenCV."""
+    return on_host([sys.executable, 'scripts/compose_video.py', '--video', a.video,
+                    '--run', a.run] + rest)
+
+
+def cmd_grid(a, rest):
+    """A grid of build videos and the camera, all on one clock. Host-side, OpenCV only."""
+    return on_host([sys.executable, 'scripts/compose_grid.py', '--run', a.run] + rest)
+
+
+def cmd_camera(a, rest):
+    out = a.out or 'runs/live'
+    return containerized(['python3', 'scripts/run_realsense.py', '--out', out] + rest,
+                         camera=True)
+
+
+def cmd_calibrate(_a, rest):
+    return containerized(['python3', 'scripts/realsense_calibrate.py'] + rest, camera=True)
+
+
+def cmd_record(a, rest):
+    return containerized(['python3', 'scripts/record_realsense.py', '--out', a.out] + rest,
+                         camera=True)
+
+
+def cmd_shell(_a, rest):
+    return containerized(rest or ['bash'])
+
+
+def main(argv=None):
+    p = argparse.ArgumentParser(prog='./davio', description=__doc__,
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = p.add_subparsers(dest='command', required=True, metavar='COMMAND')
+
+    def command(name, help, script=None):
+        """A subparser that says which script carries the rest of the options."""
+        return sub.add_parser(
+            name, help=help,
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            epilog=None if script is None else
+            f'Unlisted options are passed through to {script}.\n'
+            f'Its full set:  python3 {script} --help')
+
+    command('doctor', 'check this checkout is ready').set_defaults(fn=doctor)
+    command('test', 'run the test suite', 'pytest').set_defaults(fn=cmd_test)
+
+    run = command('run', 'one online run on a sequence, then score it', 'scripts/run_davio.py')
+    run.add_argument('sequence')
+    run.add_argument('--dataset', default='euroc', choices=DATASETS)
+    run.add_argument('--data', help='folder holding the sequence (default data/<dataset>)')
+    run.add_argument('--rate', type=float, default=1., help='1 = sensor rate, 0 = unpaced')
+    run.add_argument('--seconds', type=float, help='stop after this much sensor time')
+    run.add_argument('--out', help='run directory (default runs/<sequence>)')
+    run.set_defaults(fn=cmd_run)
+
+    ev = command('evaluate', 'score a run against its reference', 'scripts/evaluate_run.py')
+    ev.add_argument('run')
+    ev.add_argument('--data', help='dataset folder (default: the one the run was made from)')
+    ev.add_argument('--surface', action='store_true',
+                    help='also score the map against the reference scan (EuRoC V1/V2, ORI)')
+    ev.set_defaults(fn=cmd_evaluate)
+
+    rig = command('rig', 'write the OpenVINS rig for your own recording',
+                  'scripts/phone_rig.py')
+    rig.add_argument('session', help='the recording: an EuRoC/ASL folder with mav0/')
+    rig.add_argument('--out', help='rig directory (default config/custom/<session name>)')
+    rig.set_defaults(fn=cmd_rig)
+
+    mp = command('map', "re-map a finished run's windows offline", 'scripts/replay_map.py')
+    mp.add_argument('run')
+    mp.add_argument('--out', help='run directory (default <run>_remap)')
+    mp.set_defaults(fn=cmd_map)
+
+    exp = command('export', "fuse a run's map into one .ply", 'scripts/export_map.py')
+    exp.add_argument('run')
+    exp.add_argument('--out', help='output file (default <run>/map.ply)')
+    exp.set_defaults(fn=cmd_export)
+
+    view = command('view', '3D viewer for a run, live or finished', 'scripts/view_run.py')
+    view.add_argument('run')
+    view.set_defaults(fn=cmd_view)
+
+    ren = command('render', "stills of a run's map, or a video of it being built",
+                  'scripts/render_map.py')
+    ren.add_argument('run')
+    ren.add_argument('--out', help='output directory (default renders/<run>)')
+    ren.add_argument('--build', choices=('fly', 'top', 'side', 'hero', 'orbit'),
+                     help='animate the map being built, seen from this camera, instead of '
+                          'rendering the finished one')
+    ren.set_defaults(fn=cmd_render)
+
+    comp = command('compose', 'set a build video beside the camera frames it was made from',
+                   'scripts/compose_video.py')
+    comp.add_argument('video')
+    comp.add_argument('--run', required=True, help='the run the video was rendered from')
+    comp.set_defaults(fn=cmd_compose)
+
+    grd = command('grid', 'several views of one run and its camera, on one clock',
+                  'scripts/compose_grid.py')
+    grd.add_argument('--run', required=True, help='the run the videos were rendered from')
+    grd.set_defaults(fn=cmd_grid)
+
+    cam = command('camera', 'live run from a RealSense', 'scripts/run_realsense.py')
+    cam.add_argument('--out', help='run directory (default runs/live)')
+    cam.set_defaults(fn=cmd_camera)
+
+    command('calibrate', 'write the RealSense rig from the attached device',
+            'scripts/realsense_calibrate.py').set_defaults(fn=cmd_calibrate)
+
+    rec = command('record', 'record a RealSense session for offline replay',
+                  'scripts/record_realsense.py')
+    rec.add_argument('out')
+    rec.set_defaults(fn=cmd_record)
+
+    command('shell', 'a shell (or any command) inside the image').set_defaults(fn=cmd_shell)
+
+    a, rest = p.parse_known_args(argv)
+    return a.fn(a, rest)
+
+
+if __name__ == '__main__':
+    sys.exit(main())

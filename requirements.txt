@@ -1,0 +1,8 @@
+numpy>=1.24
+scipy>=1.10
+opencv-python-headless>=4.8
+PyYAML>=6.0
+pybind11>=2.11
+pytest>=7.4
+kornia==0.8.2  # official XFeat LighterGlue backend
+rerun-sdk==0.23.1   # separate live/offline visualization processes
