@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DAVIO</title>
+<meta name="description" content="DAVIO: dense monocular-inertial SLAM with feed-forward initialization and pose-conditioned mapping. Explore the metric dense maps it builds in your browser.">
+<meta property="og:title" content="DAVIO — dense monocular–inertial SLAM">
+<meta property="og:description" content="An unmodified OpenVINS filter with Depth Anything 3 at both ends: a metric start before parallax, and a metric dense map built online.">
+<meta property="og:image" content="assets/teaser.jpg">
+<style>
+  :root {
+    --ink: #0f172a;
+    --soft: #475569;
+    --faint: #94a3b8;
+    --line: #e2e8f0;
+    --bg: #ffffff;
+    --tint: #f8fafc;
+    --accent: #2563eb;
+    --accent-ink: #ffffff;
+    --radius: 14px;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #e2e8f0; --soft: #a1acbd; --faint: #64748b; --line: #1e293b;
+      --bg: #0b1120; --tint: #0f172a; --accent: #60a5fa; --accent-ink: #0b1120;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #e2e8f0; --soft: #a1acbd; --faint: #64748b; --line: #1e293b;
+    --bg: #0b1120; --tint: #0f172a; --accent: #60a5fa; --accent-ink: #0b1120;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.65 var(--sans);
+         -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+  /* nav */
+  nav.top { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 88%, transparent);
+            backdrop-filter: saturate(160%) blur(10px); border-bottom: 1px solid var(--line); }
+  nav.top .wrap { display: flex; align-items: center; gap: 22px; height: 54px; }
+  nav.top .brand { font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
+  nav.top .links { display: flex; gap: 18px; margin-left: auto; font-size: 14px; }
+  nav.top .links a { color: var(--soft); }
+  nav.top .links a:hover { color: var(--ink); text-decoration: none; }
+  @media (max-width: 640px) { nav.top .links a.optional { display: none; } }
+
+  /* hero */
+  .hero { padding: 64px 0 28px; text-align: center; }
+  .hero h1 { font-size: clamp(40px, 7vw, 72px); line-height: 1; margin: 0; letter-spacing: -0.035em; }
+  .hero .tagline { font-size: clamp(18px, 2.4vw, 22px); color: var(--soft); max-width: 760px;
+                   margin: 18px auto 0; line-height: 1.45; }
+  .buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 26px; }
+  .button { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px;
+            font-weight: 600; font-size: 15px; border: 1px solid var(--line); color: var(--ink); background: var(--bg); }
+  .button.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .button:hover { text-decoration: none; filter: brightness(0.96); }
+  .button.muted { color: var(--faint); cursor: default; }
+  .button svg { width: 17px; height: 17px; }
+  .teaser { margin: 34px auto 0; }
+  .teaser video { width: 100%; display: block; border-radius: var(--radius); background: #111;
+                  box-shadow: 0 20px 50px -24px rgba(15, 23, 42, .45); }
+  .caption { color: var(--soft); font-size: 14px; margin-top: 12px; text-align: center; }
+
+  /* sections */
+  section { padding: 56px 0; }
+  section + section { border-top: 1px solid var(--line); }
+  .eyebrow { font: 600 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+             color: var(--accent); margin: 0 0 12px; }
+  h2 { font-size: clamp(26px, 3.4vw, 34px); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 14px; }
+  .lead { font-size: 18px; color: var(--soft); max-width: 780px; margin: 0; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 30px; }
+  .card { background: var(--tint); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; }
+  .card .figure { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+  .card .figure small { font-size: 15px; font-weight: 500; color: var(--soft); letter-spacing: 0; }
+  .card h3 { font-size: 16px; margin: 12px 0 6px; }
+  .card p { margin: 0; color: var(--soft); font-size: 14.5px; }
+
+  /* viewer */
+  .tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--tint);
+          border: 1px solid var(--line); margin: 26px 0 14px; }
+  .tabs button { font: 600 14px var(--sans); padding: 8px 16px; border-radius: 999px; border: 0;
+                 background: transparent; color: var(--soft); cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: var(--bg); color: var(--ink);
+                                       box-shadow: 0 1px 3px rgba(15, 23, 42, .15); }
+  .stage { position: relative; width: 100%; aspect-ratio: 16 / 9; min-height: 340px; border-radius: var(--radius);
+           overflow: hidden; background: #f2f4f7; border: 1px solid var(--line); touch-action: none; }
+  .stage canvas { display: block; width: 100%; height: 100%; }
+  .chip { position: absolute; font: 12px/1.3 var(--mono); background: rgba(255, 255, 255, .88); color: #0f172a;
+          padding: 6px 10px; border-radius: 8px; pointer-events: none; backdrop-filter: blur(6px); }
+  .chip.badge { left: 12px; top: 12px; }
+  .chip.hint { right: 12px; bottom: 12px; color: #475569; }
+  .toolbar { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .toolbar button { font: 600 12.5px var(--sans); padding: 7px 11px; border-radius: 8px; border: 0; cursor: pointer;
+                    background: rgba(255, 255, 255, .92); color: #0f172a; box-shadow: 0 1px 2px rgba(15, 23, 42, .15); }
+  .toolbar button:hover { background: #fff; }
+  .loading { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px;
+             font: 13px var(--mono); color: #64748b; background: #f2f4f7; }
+  .loading.hidden { display: none; }
+  .bar { width: 240px; max-width: 60vw; height: 3px; background: #e2e8f0; border-radius: 2px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: #2563eb; transition: width .15s linear; }
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px 28px;
+              margin-top: 16px; font-size: 14px; color: var(--soft); }
+  .controls label { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .controls .value { font-family: var(--mono); color: var(--ink); }
+  .controls input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .switches { display: flex; gap: 18px; align-items: center; }
+  .switches label { display: flex; gap: 8px; align-items: center; margin: 0; color: var(--ink); cursor: pointer; }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px 26px; margin-top: 18px; font: 13.5px var(--mono); color: var(--soft); }
+  .facts b { color: var(--ink); }
+  .note { color: var(--soft); font-size: 14.5px; margin-top: 16px; }
+
+  /* figures and video */
+  .media { margin-top: 26px; }
+  .media img, .media video { width: 100%; display: block; border-radius: var(--radius); border: 1px solid var(--line);
+                             background: #fff; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center; }
+  @media (max-width: 820px) { .split { grid-template-columns: 1fr; } }
+  ul.points { margin: 18px 0 0; padding: 0; list-style: none; }
+  ul.points li { padding: 10px 0 10px 28px; position: relative; color: var(--soft); border-top: 1px solid var(--line); }
+  ul.points li:first-child { border-top: 0; }
+  ul.points li::before { content: ""; position: absolute; left: 4px; top: 19px; width: 8px; height: 8px;
+                         border-radius: 50%; background: var(--accent); }
+  ul.points b { color: var(--ink); }
+
+  /* results */
+  table { width: 100%; border-collapse: collapse; margin-top: 22px; font-size: 15px; }
+  th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; }
+  th { font: 600 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+  td.num, th.num { text-align: right; font-family: var(--mono); }
+
+  /* code */
+  pre { background: var(--tint); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px;
+        overflow-x: auto; font: 13.5px/1.65 var(--mono); margin: 22px 0 0; }
+  pre .c { color: var(--faint); }
+  footer { padding: 36px 0 60px; color: var(--faint); font-size: 14px; border-top: 1px solid var(--line); }
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="wrap">
+    <a class="brand" href="#">DAVIO</a>
+    <div class="links">
+      <a href="#maps">Maps</a>
+      <a class="optional" href="#method">Method</a>
+      <a class="optional" href="#results">Results</a>
+      <a href="#start">Get started</a>
+      <a href="https://github.com/be2rlab/DAVIO">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>DAVIO</h1>
+    <p class="tagline">Dense monocular–inertial SLAM with feed-forward initialization and
+      pose-conditioned mapping: one camera, one IMU, and a metric dense map built while
+      you walk.</p>
+    <div class="buttons">
+      <a class="button primary" href="https://github.com/be2rlab/DAVIO">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        Code</a>
+      <a class="button" href="#maps">Explore the maps</a>
+      <span class="button muted" title="The paper is under review">Paper — soon</span>
+    </div>
+    <div class="teaser">
+      <video autoplay muted loop playsinline preload="metadata" poster="assets/grid_ori.jpg">
+        <source src="assets/grid_ori.mp4" type="video/mp4">
+      </video>
+      <p class="caption">ORI r01, a building interior. Top left, the camera; around it, the map
+        DAVIO builds from those frames — all four views show the same moment.</p>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">In short</p>
+    <h2>A visual–inertial filter that starts sooner and maps densely, without slowing down.</h2>
+    <p class="lead">DAVIO runs an unmodified OpenVINS filter with Depth Anything 3 at both ends
+      of it. At start-up the depth model gives the filter a metric, gravity-aligned state before
+      there is any parallax; during tracking the filter's poses condition the same model, so
+      the dense map it predicts is metric. The mapper never writes into the filter, so it can
+      never block a pose.</p>
+    <div class="cards">
+      <div class="card">
+        <div class="figure">2.3 s <small>vs 4.7 s</small></div>
+        <h3>Starts before parallax</h3>
+        <p>A five-image window and preintegrated IMU form a feature-free linear system:
+          median time to a usable state in the EuRoC machine hall, at comparable success.</p>
+      </div>
+      <div class="card">
+        <div class="figure">0.07–0.10 m <small>from 0.19–0.28</small></div>
+        <h3>A metric dense map, online</h3>
+        <p>Mean surface error on five building-scale ORI sequences, once the filter's own poses
+          condition the depth model.</p>
+      </div>
+      <div class="card">
+        <div class="figure">20.7 → 10.9 cm</div>
+        <h3>Loop closure without the filter</h3>
+        <p>A gravity-preserving submap graph closes loops in the map frame only. On ORI r01 an
+          offline re-map closes 10 loops and halves the trajectory error.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="maps">
+  <div class="wrap">
+    <p class="eyebrow">Interactive</p>
+    <h2>The maps, in your browser</h2>
+    <p class="lead">Each is the run's own fused output, thinned for the browser. Drag to orbit,
+      scroll to zoom, right-drag to pan. The tube is the trajectory, blue at the start to red at
+      the end.</p>
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <div class="stage" id="stage">
+      <div class="chip badge" id="badge">—</div>
+      <div class="toolbar">
+        <button data-view="hero">3/4 view</button>
+        <button data-view="top">Top</button>
+        <button data-view="side">Side</button>
+      </div>
+      <div class="chip hint">drag · scroll · right-drag</div>
+      <div class="loading" id="loading"><span id="loadingText">loading…</span>
+        <span class="bar"><i id="loadingBar"></i></span></div>
+    </div>
+    <div class="controls">
+      <div>
+        <label for="ceiling"><span>Cut the ceiling</span><span class="value" id="ceilingValue"></span></label>
+        <input type="range" id="ceiling" min="0" max="100" step="1" value="80">
+      </div>
+      <div>
+        <label for="pointSize"><span>Point size</span><span class="value" id="pointSizeValue"></span></label>
+        <input type="range" id="pointSize" min="1" max="7" step="0.5" value="2.5">
+      </div>
+      <div class="switches">
+        <label><input type="checkbox" id="showPath" checked> trajectory</label>
+        <label><input type="checkbox" id="spin"> spin</label>
+      </div>
+    </div>
+    <div class="facts" id="facts"></div>
+    <p class="note">EuRoC is a monochrome dataset, so its map is grey — that is the sensor, not
+      the method. The phone walk was recorded with no calibration at all.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap split">
+    <div>
+      <p class="eyebrow">Your own data</p>
+      <h2>It runs on a phone, uncalibrated.</h2>
+      <p class="lead">212 seconds along a beach promenade, recorded with a phone held in
+        portrait: intrinsics from the lens spec, no camera–IMU calibration, placeholder IMU noise.</p>
+      <ul class="points">
+        <li>DAVIO's initializer and OpenVINS's online calibration recover the focal length and a
+          <b>15 ms</b> camera–IMU time offset while it runs.</li>
+        <li><b>186 m</b> walked with no jumps, and under a metre of height drift.</li>
+        <li>Sky gets a finite depth from the network; two settings keep it out of the map.</li>
+      </ul>
+    </div>
+    <div class="media" style="margin-top:0">
+      <video controls muted loop playsinline preload="none" poster="assets/grid_beach.jpg">
+        <source src="assets/grid_beach.mp4" type="video/mp4">
+      </video>
+    </div>
+  </div>
+</section>
+
+<section id="method">
+  <div class="wrap">
+    <p class="eyebrow">Method</p>
+    <h2>Depth Anything 3 at both ends of an unmodified filter</h2>
+    <div class="media">
+      <img src="assets/pipeline.png" alt="DAVIO pipeline: feed-forward initialization, unmodified OpenVINS tracking, asynchronous pose-conditioned dense mapping with a submap graph">
+    </div>
+    <ul class="points">
+      <li><b>Feed-forward initialization.</b> DA3 geometry for five frames plus IMU
+        preintegration gives scale, velocity, gravity and biases in one robust linear solve,
+        handed to the filter through buffered replay.</li>
+      <li><b>Pose-conditioned mapping.</b> The filter's metric camera poses condition DA3, so
+        its depth is metric; residual scale acts on depth only, never on camera baselines.</li>
+      <li><b>A graph beside the filter.</b> Submaps are refined by overlap and verified loop
+        closures, and the result is a map-frame correction — never a state written back.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="results">
+  <div class="wrap">
+    <p class="eyebrow">Results</p>
+    <h2>The runs shown above</h2>
+    <table>
+      <thead><tr><th>Sequence</th><th>Trajectory</th><th class="num">ATE</th>
+        <th class="num">Submaps</th><th class="num">Loops</th></tr></thead>
+      <tbody id="numbers"><tr><td colspan="5">loading…</td></tr></tbody>
+    </table>
+    <p class="note">ATE against each dataset's own reference. <em>Online</em> is the live filter
+      stream; <em>re-mapped</em> is the same run pushed through the back-end again offline, where
+      loop closures are free to move the map frame. The phone walk has no reference, so no
+      number — which is the honest answer. The paper has the full tables.</p>
+  </div>
+</section>
+
+<section id="start">
+  <div class="wrap">
+    <p class="eyebrow">Get started</p>
+    <h2>From a clone to a map</h2>
+    <p class="lead">Linux, Docker and an NVIDIA GPU; everything else is built into an image.</p>
+<pre><span class="c"># once: images, OpenVINS, model weights</span>
+git clone --recursive https://github.com/be2rlab/DAVIO.git && cd DAVIO
+make setup
+
+<span class="c"># EuRoC, ORI, or your own recording</span>
+make euroc && ./davio run V1_01_easy
+./davio view runs/V1_01_easy</pre>
+    <p class="note">The <a href="https://github.com/be2rlab/DAVIO#readme">README</a> covers ORI,
+      your own data and evaluation.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">Citation</p>
+<pre>@inproceedings{davio,
+  title     = {DAVIO: Dense Monocular--Inertial SLAM with Feed-Forward
+               Initialization and Pose-Conditioned Mapping},
+  year      = {2026}
+}</pre>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">DAVIO is GPL-3.0. Built on <a href="https://github.com/rpng/open_vins">OpenVINS</a>,
+    <a href="https://github.com/ByteDance-Seed/Depth-Anything-3">Depth Anything 3</a> and
+    <a href="https://github.com/verlab/accelerated_features">XFeat</a>.</div>
+</footer>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ceiling: where the cut starts (100 = off). view: the first shot. An indoor map opens with
+// its roof cut away; a long outdoor walk reads best from overhead, and has no roof to cut.
+const DATASETS = [
+  { name: 'ori',   label: 'ORI r01',     ceiling: 80,  view: 'hero' },
+  { name: 'euroc', label: 'EuRoC V1_01', ceiling: 80,  view: 'hero' },
+  { name: 'beach', label: 'Phone walk',  ceiling: 100, view: 'top' },
+];
+
+const stage = document.getElementById('stage');
+const badge = document.getElementById('badge');
+const facts = document.getElementById('facts');
+const loading = document.getElementById('loading');
+const loadingText = document.getElementById('loadingText');
+const loadingBar = document.getElementById('loadingBar');
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.localClippingEnabled = true;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+// The stage stays light in either theme: the maps are lit scenes and the trajectory ramp
+// starts dark, so both disappear against a dark panel.
+scene.background = new THREE.Color(0xf2f4f7);
+const camera = new THREE.PerspectiveCamera(55, 16 / 9, 0.05, 4000);
+// The maps are gravity-aligned with z up. OrbitControls fixes its orbit axis from the
+// camera's up when it is created, so this has to come first and never change.
+camera.up.set(0, 0, 1);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+scene.add(new THREE.AmbientLight(0xffffff, 1.6));
+const key = new THREE.DirectionalLight(0xffffff, 1.1);
+key.position.set(1, 1, 2);
+scene.add(key);
+
+
+const clip = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+const material = new THREE.PointsMaterial({ size: 2.5, sizeAttenuation: false,
+                                            vertexColors: true, clippingPlanes: [] });
+
+let current = null;
+const cache = new Map();
+let spinning = false;
+
+function resize() {
+  const { clientWidth: w, clientHeight: h } = stage;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+
+/** Blue to red over the walk: the colouring the offline renders use for time. */
+function ramp(t) {
+  const stops = [[0.20,0.30,0.85],[0.15,0.62,0.98],[0.10,0.85,0.75],[0.55,0.95,0.25],
+                 [0.97,0.70,0.15],[0.92,0.28,0.05],[0.70,0.05,0.05]];
+  const x = Math.max(0, Math.min(1, t)) * (stops.length - 1);
+  const i = Math.floor(x), f = x - i;
+  const a = stops[i], b = stops[Math.min(i + 1, stops.length - 1)];
+  return [a[0] + (b[0]-a[0])*f, a[1] + (b[1]-a[1])*f, a[2] + (b[2]-a[2])*f];
+}
+
+async function fetchProgress(url, onProgress) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`${url}: ${response.status}`);
+  const total = Number(response.headers.get('content-length')) || 0;
+  if (!response.body || !total) return new Uint8Array(await response.arrayBuffer());
+  const reader = response.body.getReader();
+  const chunks = [];
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.length;
+    onProgress(received / total);
+  }
+  const out = new Uint8Array(received);
+  let at = 0;
+  for (const chunk of chunks) { out.set(chunk, at); at += chunk.length; }
+  return out;
+}
+
+/** The map arrives as count x 3 uint16 positions then count x 3 uint8 colours. */
+function buildCloud(meta, bytes) {
+  const n = meta.count;
+  const quantized = new Uint16Array(bytes.buffer, bytes.byteOffset, n * 3);
+  const colours = new Uint8Array(bytes.buffer, bytes.byteOffset + n * 6, n * 3);
+  const positions = new Float32Array(n * 3);
+  const rgb = new Float32Array(n * 3);
+  const [ox, oy, oz] = meta.offset, [sx, sy, sz] = meta.scale;
+  for (let i = 0; i < n; i++) {
+    positions[i*3]     = ox + quantized[i*3]     * sx;
+    positions[i*3 + 1] = oy + quantized[i*3 + 1] * sy;
+    positions[i*3 + 2] = oz + quantized[i*3 + 2] * sz;
+    rgb[i*3]     = Math.pow(colours[i*3]     / 255, 2.2);   // sRGB bytes -> linear
+    rgb[i*3 + 1] = Math.pow(colours[i*3 + 1] / 255, 2.2);
+    rgb[i*3 + 2] = Math.pow(colours[i*3 + 2] / 255, 2.2);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(rgb, 3));
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return new THREE.Points(geometry, material);
+}
+
+function buildPath(meta, radius) {
+  const flat = meta.trajectory && meta.trajectory.points;
+  if (!flat || flat.length < 6) return null;
+  const nodes = [];
+  for (let i = 0; i < flat.length; i += 3) nodes.push(new THREE.Vector3(flat[i], flat[i+1], flat[i+2]));
+  const curve = new THREE.CatmullRomCurve3(nodes);
+  const segments = Math.min(1800, nodes.length * 2);
+  const tube = new THREE.TubeGeometry(curve, segments, radius / 120, 10, false);
+  const colours = new Float32Array(tube.attributes.position.count * 3);
+  // TubeGeometry lays vertices out ring by ring, so the ring index is the time fraction.
+  const rings = segments + 1, perRing = tube.attributes.position.count / rings;
+  for (let r = 0; r < rings; r++) {
+    const [cr, cg, cb] = ramp(r / (rings - 1));
+    for (let k = 0; k < perRing; k++) {
+      const i = (r * perRing + k) * 3;
+      colours[i] = cr; colours[i+1] = cg; colours[i+2] = cb;
+    }
+  }
+  tube.setAttribute('color', new THREE.BufferAttribute(colours, 3));
+  const mesh = new THREE.Mesh(tube, new THREE.MeshLambertMaterial({ vertexColors: true, clippingPlanes: [] }));
+  // Indoors the path spends most of its length behind a wall: a faint copy that ignores
+  // depth keeps the whole route readable. Solid where visible, a ghost where it is not.
+  const ghost = new THREE.Mesh(tube, new THREE.MeshBasicMaterial({
+    vertexColors: true, transparent: true, opacity: 0.30, depthTest: false, clippingPlanes: [] }));
+  ghost.renderOrder = -1;
+  mesh.add(ghost);
+  mesh.userData.materials = [mesh.material, ghost.material];
+  return mesh;
+}
+
+/** Degrees to the cloud's longest horizontal axis, so a corridor lies across the frame. */
+function principalAzimuth(sample) {
+  let mx = 0, my = 0;
+  for (let i = 0; i < sample.length; i += 2) { mx += sample[i]; my += sample[i+1]; }
+  const n = sample.length / 2;
+  mx /= n; my /= n;
+  let xx = 0, xy = 0, yy = 0;
+  for (let i = 0; i < sample.length; i += 2) {
+    const dx = sample[i] - mx, dy = sample[i+1] - my;
+    xx += dx * dx; xy += dx * dy; yy += dy * dy;
+  }
+  return THREE.MathUtils.radToDeg(0.5 * Math.atan2(2 * xy, xx - yy));
+}
+
+/** How far back the camera must sit on `direction` for (nearly) every point to be in frame. */
+function fitDistance(direction, up) {
+  const forward = direction.clone().multiplyScalar(-1).normalize();
+  let right = new THREE.Vector3().crossVectors(forward, up);
+  if (right.lengthSq() < 1e-12) right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(1, 0, 0));
+  right.normalize();
+  const down = new THREE.Vector3().crossVectors(forward, right);
+  const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+  const tanH = tanV * camera.aspect;
+  const positions = current.points.geometry.attributes.position.array;
+  const centre = current.centre;
+  const stride = Math.max(3, Math.floor(positions.length / 3 / 40000) * 3);
+  const needed = [];
+  for (let i = 0; i < positions.length; i += stride) {
+    const ox = positions[i] - centre.x, oy = positions[i+1] - centre.y, oz = positions[i+2] - centre.z;
+    const x = ox * right.x + oy * right.y + oz * right.z;
+    const y = ox * down.x + oy * down.y + oz * down.z;
+    const z = ox * forward.x + oy * forward.y + oz * forward.z;
+    needed.push(Math.max(Math.abs(x) / tanH, Math.abs(y) / tanV) - z);
+  }
+  // A quantile, not the maximum, so a few stray points cannot leave the scene tiny.
+  needed.sort((a, b) => a - b);
+  return needed[Math.floor(needed.length * 0.99)] * 1.03;
+}
+
+function frame(view) {
+  if (!current) return;
+  // Every shot looks across the scene's long axis, so it lies along the width of the frame.
+  // Looking almost straight down with z up, the top of the screen faces away from the
+  // camera's azimuth, hence the half turn for the overhead shot.
+  const across = current.axisDeg + 90;
+  const shots = { hero: { elevation: 38, azimuth: across },
+                  top:  { elevation: 89.5, azimuth: across - 180 },
+                  side: { elevation: 6, azimuth: across + 90 } };
+  const shot = shots[view] || shots.hero;
+  const elevation = THREE.MathUtils.degToRad(shot.elevation);
+  const angle = THREE.MathUtils.degToRad(shot.azimuth);
+  const direction = new THREE.Vector3(Math.cos(elevation) * Math.cos(angle),
+                                      Math.cos(elevation) * Math.sin(angle), Math.sin(elevation));
+  const distance = fitDistance(direction, camera.up);
+  camera.position.copy(current.centre).addScaledVector(direction, distance);
+  controls.target.copy(current.centre);
+  controls.update();
+}
+
+function setFacts(meta) {
+  const n = meta.numbers || {};
+  const bits = [`<span><b>${(meta.count / 1000).toFixed(0)}k</b> points</span>`];
+  if (meta.trajectory) bits.push(`<span><b>${meta.trajectory.duration_s} s</b> of motion</span>`);
+  if (n.submaps) bits.push(`<span><b>${n.submaps}</b> submaps</span>`);
+  if (n.ate_online_m !== undefined) bits.push(`<span>ATE online <b>${(n.ate_online_m * 100).toFixed(1)} cm</b></span>`);
+  if (n.ate_map_m !== undefined) bits.push(`<span>re-mapped <b>${(n.ate_map_m * 100).toFixed(1)} cm</b></span>`);
+  if (n.loops) bits.push(`<span><b>${n.loops}</b> loop closures</span>`);
+  facts.innerHTML = bits.join('');
+}
+
+function numbersTable(metas) {
+  const rows = [];
+  for (const meta of metas) {
+    const n = meta.numbers || {};
+    if (n.ate_online_m === undefined) continue;
+    rows.push(`<tr><td>${meta.title}</td><td>online</td><td class="num">${(n.ate_online_m * 100).toFixed(1)} cm</td>
+      <td class="num">${n.submaps ?? '—'}</td><td class="num">—</td></tr>`);
+    if (n.ate_map_m !== undefined)
+      rows.push(`<tr><td>${meta.title}</td><td>re-mapped offline</td><td class="num">${(n.ate_map_m * 100).toFixed(1)} cm</td>
+        <td class="num">${n.submaps ?? '—'}</td><td class="num">${n.loops ?? '—'}</td></tr>`);
+  }
+  document.getElementById('numbers').innerHTML = rows.join('') ||
+    '<tr><td colspan="5">no scored runs in this build</td></tr>';
+}
+
+async function load(dataset) {
+  loading.classList.remove('hidden');
+  loadingText.textContent = 'loading map…';
+  loadingBar.style.width = '0%';
+  if (current) { scene.remove(current.points); if (current.path) scene.remove(current.path); }
+  let entry = cache.get(dataset.name);
+  if (!entry) {
+    const meta = await (await fetch(`assets/maps/${dataset.name}.json`)).json();
+    const bytes = await fetchProgress(`assets/maps/${meta.bin}`,
+      p => { loadingBar.style.width = `${(p * 100).toFixed(0)}%`; });
+    const points = buildCloud(meta, bytes);
+    const sphere = points.geometry.boundingSphere;
+    const positions = points.geometry.attributes.position.array;
+    const stride = Math.max(3, Math.floor(positions.length / 3 / 30000) * 3);
+    const flat = [], xs = [], ys = [], heights = [];
+    for (let i = 0; i < positions.length; i += stride) {
+      flat.push(positions[i], positions[i+1]);
+      xs.push(positions[i]); ys.push(positions[i+1]); heights.push(positions[i+2]);
+    }
+    // The ceiling slider is a quantile of the points' heights, not a fraction of the extent,
+    // and the camera aims at the middle of the 1-99 % box rather than the bounding sphere:
+    // either way a few stray points would otherwise decide where everything goes.
+    for (const values of [xs, ys, heights]) values.sort((a, b) => a - b);
+    const middle = v => (v[Math.floor(v.length * 0.01)] + v[Math.floor(v.length * 0.99)]) / 2;
+    entry = { meta, points, path: buildPath(meta, sphere.radius),
+              centre: new THREE.Vector3(middle(xs), middle(ys), middle(heights)),
+              axisDeg: principalAzimuth(flat), heights: Float64Array.from(heights) };
+    cache.set(dataset.name, entry);
+  }
+  current = entry;
+  scene.add(entry.points);
+  if (entry.path && document.getElementById('showPath').checked) scene.add(entry.path);
+  document.getElementById('ceiling').value = dataset.ceiling;
+  applyCeiling();
+  badge.textContent = [entry.meta.title, entry.meta.note].filter(Boolean).join(' · ');
+  setFacts(entry.meta);
+  frame(dataset.view);
+  loading.classList.add('hidden');
+}
+
+function applyCeiling() {
+  if (!current) return;
+  const fraction = Number(document.getElementById('ceiling').value) / 100;
+  const heights = current.heights;
+  const z = heights[Math.min(heights.length - 1, Math.floor(fraction * (heights.length - 1)))];
+  const off = fraction >= 1;
+  clip.constant = z;
+  // No planes at all switches clipping off; an infinite plane would discard everything.
+  for (const target of [material].concat((current.path && current.path.userData.materials) || [])) {
+    const planes = off ? [] : [clip];
+    if (target.clippingPlanes.length !== planes.length) target.needsUpdate = true;
+    target.clippingPlanes = planes;
+  }
+  document.getElementById('ceilingValue').textContent = off ? 'off' : `${z.toFixed(1)} m`;
+}
+
+document.getElementById('ceiling').addEventListener('input', applyCeiling);
+document.getElementById('pointSize').addEventListener('input', e => {
+  material.size = Number(e.target.value);
+  document.getElementById('pointSizeValue').textContent = e.target.value;
+});
+document.getElementById('pointSizeValue').textContent = document.getElementById('pointSize').value;
+document.getElementById('showPath').addEventListener('change', e => {
+  if (!current || !current.path) return;
+  if (e.target.checked) scene.add(current.path); else scene.remove(current.path);
+});
+document.getElementById('spin').addEventListener('change', e => { spinning = e.target.checked; });
+for (const button of document.querySelectorAll('[data-view]'))
+  button.addEventListener('click', () => frame(button.dataset.view));
+
+const tabs = document.getElementById('tabs');
+DATASETS.forEach((dataset, i) => {
+  const button = document.createElement('button');
+  button.textContent = dataset.label;
+  button.setAttribute('role', 'tab');
+  button.setAttribute('aria-selected', String(i === 0));
+  button.addEventListener('click', () => {
+    for (const other of tabs.children) other.setAttribute('aria-selected', 'false');
+    button.setAttribute('aria-selected', 'true');
+    load(dataset).catch(reportFailure);
+  });
+  tabs.appendChild(button);
+});
+
+function reportFailure(error) {
+  loading.classList.remove('hidden');
+  loadingText.textContent = String(error.message || error);
+  loadingBar.style.width = '0%';
+  console.error(error);
+}
+
+function tick() {
+  requestAnimationFrame(tick);
+  if (spinning && current) {
+    const offset = camera.position.clone().sub(controls.target);
+    offset.applyAxisAngle(new THREE.Vector3(0, 0, 1), 0.0015);
+    camera.position.copy(controls.target).add(offset);
+  }
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// A handle for the console, and for the headless check this page is tested with.
+window.DAVIO = { THREE, scene, camera, controls, material, clip, frame, get current() { return current; } };
+
+resize();
+tick();
+load(DATASETS[0]).catch(reportFailure);
+Promise.all(DATASETS.map(d => fetch(`assets/maps/${d.name}.json`).then(r => r.ok ? r.json() : null)))
+  .then(metas => numbersTable(metas.filter(Boolean)))
+  .catch(() => {});
+</script>
+</body>
+</html>

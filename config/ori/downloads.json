@@ -1,0 +1,32 @@
+{
+  "source_page": "https://github.com/ori-drs/ScaRF-SLAM/wiki/1.-%F0%9F%93%A5-Dataset",
+  "source_folder": "https://drive.google.com/drive/folders/1yYc3ctsetFZquQLp0JlV6gAeFr_35No8",
+  "note": "Restored 2026-09-13 from data/ori/*/download_manifest.json; ids/sizes are the official pinned values.",
+  "sequences": {
+    "r01": {
+      "file_id": "1j2OurHPiWb-AKLhQmnG1eiZXgFIaEtRE",
+      "bytes": 2177349011,
+      "sha256": "bd56096c7c98b9c837beef45a1193c3a33a8c7603674d6ea617938a48dbe2b09"
+    },
+    "r02": {
+      "file_id": "1mu9GFEaF75D_j1lmLhnVqQ7WxAF3eUnw",
+      "bytes": 1993002138,
+      "sha256": "f0921f872aea5eda1a3bab512ff90807c9354826f7dc1da5e4351b926e6b86b3"
+    },
+    "r03": {
+      "file_id": "1bLVTfWyE0nPSbcOx3LGxxLYn0XzexYl7",
+      "bytes": 1973538608,
+      "sha256": "405dd317f81116d2874514ef81f6b89c8cfc69f3f27f1f5f6e81bd771f7cf890"
+    },
+    "r04": {
+      "file_id": "14Rw2eMe_bvIN8P3U3NR7AO0SCP1xxMNi",
+      "bytes": 2787897622,
+      "sha256": "88564e78a347461ccf968d2be9dc125db791228524a2de1ae97925c12a694da4"
+    },
+    "r05": {
+      "file_id": "1nOc6ns0wl-Uu_6m0allAPUXac8XYIrhk",
+      "bytes": 1549127166,
+      "sha256": "3846f6d0e332b1ec8b17762001ed04d5f69b18176b256a357933b4746fb306c9"
+    }
+  }
+}
