@@ -9,7 +9,7 @@ poses then condition the same model, so the dense map it builds online is metric
 
 <p align="center"><img src="website/assets/teaser.jpg" width="100%" alt="Dense metric map of ORI r01 with the trajectory"></p>
 
-**[Project page](https://be2rlab.github.io/DAVIO/)** · **[Paper](#citation)**
+**[Project page](https://be2rlab.github.io/DAVIO/)** · **[Paper](https://arxiv.org/abs/2609.27702)**
 
 ---
 
@@ -138,12 +138,15 @@ run without editing it: `./davio run V1_01_easy --set mapping.keyframe_period_s=
 ## Citation
 
 ```bibtex
-@inproceedings{davio,
-  title     = {DAVIO: Dense Monocular--Inertial SLAM with Feed-Forward
-               Initialization and Pose-Conditioned Mapping},
-  year      = {2026}
-}
-```
+@misc{mahmoud2026daviodensemonocularinertialslam,
+      title={DAVIO: Dense Monocular-Inertial SLAM with Feed-Forward Initialization and Pose-Conditioned Mapping}, 
+      author={Jaafar Mahmoud and Arthur Movsesyan and Mikhail Iumanov and Sergey Kolyubin},
+      year={2026},
+      eprint={2609.27702},
+      archivePrefix={arXiv},
+      primaryClass={cs.RO},
+      url={https://arxiv.org/abs/2609.27702}, 
+}```
 
 ## License
 
