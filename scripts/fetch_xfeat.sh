@@ -6,4 +6,4 @@ if [ ! -d thirdparty/accelerated_features ]; then
 fi
 git -C thirdparty/accelerated_features checkout e92685f57f8318b18725c5c8c0bd28c7fe188d9a
 git -C thirdparty/accelerated_features rev-parse HEAD
-# kornia (the LighterGlue backend) is already in the image and in requirements.txt.
+

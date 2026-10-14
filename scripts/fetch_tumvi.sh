@@ -5,7 +5,7 @@ DATA_ROOT="${1:?usage: fetch_tumvi.sh <data_root> [seq ...]}"
 shift || true
 SEQS=("$@")
 if [ ${#SEQS[@]} -eq 0 ]; then
-  SEQS=(room1 room2 room3 room4 room5 room6)
+  SEQS=(room1)
 fi
 
 BASE="https://cdn3.vision.in.tum.de/tumvi/exported/euroc/512_16"
@@ -18,7 +18,7 @@ for seq in "${SEQS[@]}"; do
   tarball="${CACHE}/${name}.tar"
   dest="${DEST_ROOT}/${seq}"
 
-  if [ -d "${dest}/mav0" ]; then
+  if [ -d "${dest}/mav0/cam0/data" ]; then         # mav0/ alone may hold only mocap0, fetched for scoring
     echo "already extracted: ${dest}"
     continue
   fi
@@ -35,7 +35,7 @@ for seq in "${SEQS[@]}"; do
   mkdir -p "${dest}"
   # The archive holds <name>/mav0/...; strip its top level so the layout matches EuRoC's.
   tar -xf "${tarball}" -C "${dest}" --strip-components=1
-  test -d "${dest}/mav0" || { echo "error: ${dest}/mav0 missing after extract" >&2; exit 1; }
+  test -d "${dest}/mav0/cam0/data" || { echo "error: ${dest}/mav0/cam0/data missing after extract" >&2; exit 1; }
 done
 
 echo "TUM-VI ready under ${DEST_ROOT}"

@@ -1,0 +1,121 @@
+# The one configuration of DAVIO. Nothing here is tuned per sequence.
+model: depth-anything/DA3-BASE     # or a checkpoint directory (run --weights)
+device: cuda
+process_res: 504                   # longer image side given to the depth model
+torch_threads: 2
+max_tracking_gap_s: 2.0            # the run stops when the filter gives no pose for this long
+shutdown_drain_s: 10.0             # at the end, how long the windows already submitted may take
+rigs:                              # the filter's configuration per dataset
+  euroc: config/euroc/estimator_config.yaml
+  ori: config/ori/estimator_config.yaml
+  custom: config/phone/estimator_config.yaml
+  tumvi: config/tumvi/estimator_config.yaml
+openvins:                          # written over the rig's estimator file
+  verbosity: WARNING
+  calib_cam_extrinsics: true
+  calib_cam_intrinsics: false
+  calib_cam_timeoffset: false
+  init_window_time: 2.0
+  init_dyn_use: true
+  init_dyn_mle_opt_calib: true
+  init_dyn_mle_max_threads: 2
+  init_dyn_mle_max_iter: 20
+  init_dyn_mle_max_time: 0.05
+  init_dyn_num_pose: 5
+  init_dyn_min_deg: 15.0
+  init_dyn_bias_g: [0.0, 0.0, 0.0]
+  init_dyn_bias_a: [0.0, 0.0, 0.0]
+mapping:
+  enabled: true
+  # Windows: keyframes every keyframe_period_s; a window is window_frames of them and shares overlap_frames with the next.
+  window_frames: 5
+  overlap_frames: 2
+  keyframe_period_s: 0.5
+  max_task_age_s: 2.0              # a window that waited longer than this for the GPU is skipped
+  # Context keyframes: older views of the same part of the scene that join a window's depth call.
+  context_frames: 2
+  context_min_age_s: 2.0
+  context_max_age_s: 20.0          # older, the odometry has drifted from the window
+  context_max_angle_deg: 30.0
+  context_range_m: [0.3, 3.0]
+  # A window is refused when its cameras barely move, or when the prediction did not follow the given poses.
+  min_baseline_m: 0.05
+  max_alignment_rmse_m: 0.15
+  max_log_scale: 0.3
+  # Relative scales of the images of a window (frame_scale.py).
+  frame_scale_pairs: 2             # image i is matched with i+1 .. i+pairs
+  frame_scale_min_matches: 30
+  frame_scale_prior_sigma: 1.0
+  frame_scale_cut: 3.0
+  frame_scale_rounds: 8
+  # Depth filter (filtering.py).
+  depth_min_m: 0.15
+  depth_max_m: 20.0
+  depth_conf_quantile: 0.2
+  depth_edge_relative: 0.15
+  depth_consistency_relative: 0.10
+  depth_min_support: 1
+  # Metric scale of a window from the keypoints the depth filter kept, triangulated against older windows under the filter's poses.
+  tri_nodes: 4                     # older windows triangulated against, most recent first
+  tri_min_baseline_m: 0.2
+  tri_max_baseline_m: 3.0
+  tri_min_parallax_deg: 2.0
+  tri_max_reprojection_px: 2.0
+  tri_max_sigma_log: 0.1
+  tri_pixel_sigma: 1.0
+  tri_pose_floor_m: 0.005
+  anchor_min_targets: 30           # an image must have this many for its window to be anchored
+  anchor_sigma0: 0.05              # log-depth sigma added to each target's own
+  anchor_max_log: 0.3              # bound on a window's offset
+  anchor_graph_sigma: 0.01         # log-scale prior of an anchored window in the graph
+  # Keypoints (features.py).
+  xfeat_path: thirdparty/accelerated_features
+  xfeat_features: 2048
+  # Matched points between windows as graph factors (graph.PointFactor).
+  sparse_max_points: 80
+  sparse_sigma_m: 0.10
+  sparse_sigma_radial: 0.10        # along the ray, as a fraction of the depth
+  sparse_sigma_lateral: 0.01
+  # Relative depth scale of two windows.
+  scale_sigma_log: 0.03
+  scale_max_relative_error: 0.5
+  scale_overlap_min_points: 200
+  # The odometry between two windows: a drift model, sigma grows with the distance travelled.
+  odometry_sigma_floor_m: 0.02
+  odometry_sigma_floor_deg: 0.5
+  odometry_drift_m_per_m: 0.005
+  odometry_drift_deg_per_m: 0.5
+  # Loop closure.
+  loops_enabled: true
+  max_loop_candidates: 4
+  loop_min_separation_s: 5.0
+  loop_search_radius_m: 8.0
+  loop_min_matches: 50
+  loop_min_inliers: 30
+  loop_min_inlier_ratio: 0.25
+  loop_reprojection_px: 2.0
+  loop_depth_relative_error: 0.2
+  loop_max_rotation_deg: 30.0
+  loop_max_translation_m: 3.0
+  loop_max_innovation_sigma: 3.0   # how far a loop may disagree with the odometry, in their joint sigmas
+  loop_min_drift_ratio: 1.0        # a loop moves poses only where the drift may exceed this many of its sigmas
+  loop_sigma_m: 0.25
+  loop_sigma_deg: 5.0
+  loop_scale_relative_error: 0.10  # a loop's translation sigma grows by this fraction of its length
+  graph_iterations: 8
+  max_active_submaps: 24           # dense geometry kept in memory; every node stays in the graph
+  max_graph_nodes: 5000
+  # The correction of the live pose stream by the map: a step beyond the jump is slid in over the ramp.
+  correction_jump_m: 0.05
+  correction_jump_deg: 2.0
+  correction_ramp_s: 1.0
+  # The fused map.
+  voxel_m: 0.04
+  pixel_step: 4
+  # At export: one scale per image from the agreement between windows (revisit.py).
+  revisit_step: 6                  # source pixels: every step-th row and column
+  revisit_max_angle_deg: 30.0      # between the two viewing rays of a surface point
+  revisit_gate_log: 0.5            # a log ratio beyond this is an occlusion
+  revisit_min_shared: 500          # shared points, each way, for a pair of images to count
+  revisit_prior_pairs: 1.0         # weight of the zero prior on a correction, in pairs
+  revisit_huber: 1.5

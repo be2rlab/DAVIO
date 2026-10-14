@@ -1,6 +1,5 @@
 %YAML:1.0
 
-
 verbosity: "INFO" # ALL, DEBUG, INFO, WARNING, ERROR, SILENT
 
 use_fej: true # if first-estimate Jacobians should be used (enable for good consistency)
@@ -23,12 +22,14 @@ max_slam_in_update: 25 # update can be split into sequential updates of batches,
 max_msckf_in_update: 200 # how many MSCKF features to use in the update
 dt_slam_delay: 0.0 # delay before initializing (helps with stability from bad initialization...)
 
-gravity_mag: 9.81 # TUM-VI: see davio_backend/data/tumvi.py on the measured 9.967 discrepancy
+gravity_mag: 9.81 # magnitude of gravity in this location
 
 feat_rep_msckf: "ANCHORED_MSCKF_INVERSE_DEPTH" #ANCHORED_MSCKF_INVERSE_DEPTH, GLOBAL_3D, ANCHORED_3D
 feat_rep_slam: "ANCHORED_MSCKF_INVERSE_DEPTH"
 feat_rep_aruco: "ANCHORED_MSCKF_INVERSE_DEPTH"
 
+# zero velocity update parameters we can use
+# we support either IMU-based or disparity detection.
 try_zupt: true
 zupt_chi2_multipler: 0 # set to 0 for only disp-based
 zupt_max_velocity: 0.1
@@ -91,8 +92,8 @@ init_dyn_use: true # if dynamic initialization should be used
 init_dyn_num_pose: 5 # number of poses to use within our window time
 init_dyn_min_deg: -1 # orientation change needed to try to init
 
-init_dyn_bias_g: [ -0.0022, 0.0216, 0.0783 ] # initial gyroscope bias guess
-init_dyn_bias_a: [ -0.0358, -0.0005, 0.0145 ] # initial accelerometer bias guess
+init_dyn_bias_g: [ 0.0, 0.0, 0.0 ] # initial gyroscope bias guess
+init_dyn_bias_a: [ 0.0, 0.0, 0.0 ] # initial accelerometer bias guess
 
 
 record_timing_information: false # if we want to record timing information of the method
@@ -145,6 +146,7 @@ relative_config_imu: "kalibr_imu_chain.yaml"
 relative_config_imucam: "kalibr_imucam_chain.yaml"
 
 
+# ---- OpenVINS-only fields ---------------------------------------------------------------
 init_dyn_mle_max_time: 0.05
 init_dyn_mle_max_threads: 6
 init_dyn_mle_opt_calib: false

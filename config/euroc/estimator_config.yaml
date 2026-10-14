@@ -28,6 +28,8 @@ feat_rep_msckf: "ANCHORED_MSCKF_INVERSE_DEPTH" #ANCHORED_MSCKF_INVERSE_DEPTH, GL
 feat_rep_slam: "ANCHORED_MSCKF_INVERSE_DEPTH"
 feat_rep_aruco: "ANCHORED_MSCKF_INVERSE_DEPTH"
 
+# zero velocity update parameters we can use
+# we support either IMU-based or disparity detection.
 try_zupt: true
 zupt_chi2_multipler: 0 # set to 0 for only disp-based
 zupt_max_velocity: 0.1
@@ -144,6 +146,7 @@ relative_config_imu: "kalibr_imu_chain.yaml"
 relative_config_imucam: "kalibr_imucam_chain.yaml"
 
 
+# ---- OpenVINS-only fields ---------------------------------------------------------------
 init_dyn_mle_max_time: 0.05
 init_dyn_mle_max_threads: 6
 init_dyn_mle_opt_calib: false
