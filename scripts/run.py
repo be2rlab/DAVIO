@@ -11,7 +11,7 @@ sys.path.insert(0, str(ROOT / 'src'))
 def main(argv=None):
     import yaml
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--dataset', required=True, choices=('euroc', 'ori'))
+    p.add_argument('--dataset', required=True, choices=('euroc', 'ori', 'custom', 'tumvi'))
     p.add_argument('--data', type=Path, required=True, help='the directory that holds the sequences')
     p.add_argument('--sequence', required=True)
     p.add_argument('--out', type=Path, required=True, help='a new run directory')

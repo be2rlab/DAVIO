@@ -69,7 +69,8 @@ def main(argv=None):
     cloud = a.map or (a.run / 'map.ply')
     reference_path = ds.root / 'pointcloud0/data.ply'
     if not reference_path.is_file():
-        raise SystemExit(f'{meta["sequence"]} has no reference surface at {reference_path}')
+        print(f'{meta["sequence"]} has no reference surface ({reference_path}); the map is not scored')
+        return 0
     out = a.out or (a.run / 'surface.json')
     if out.exists() and not a.force:
         raise SystemExit(f'{out} exists; pass --force to replace it')
