@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "davio"
 version = "0.1.0"
-description = "Dense metric mapping from one camera and an IMU, online"
+description = "Calibration-assisted OpenVINS with asynchronous dense metric mapping"
 requires-python = ">=3.10"
 dynamic = ["dependencies"]
 

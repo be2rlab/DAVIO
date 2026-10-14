@@ -1,26 +1,9 @@
-"""Trajectory scores against the reference. The reference enters the repository here and in the map scorer only."""
-from pathlib import Path
-
 import numpy as np
-from scipy.spatial.transform import Rotation
-
-from ..geometry import quat_to_rot, rot_to_quat
+from ..init.jpl import quat_to_rot
 
 MATCH_TOLERANCE_S = .05
 MIN_MATCHED_POSES = 10
-
-
-def read_trajectory(path):
-    """A TUM file of body poses as (t, p, q_GtoI) rows, the quaternion as the filter writes it (JPL)."""
-    out = []
-    for line in Path(path).read_text().splitlines():
-        if not line.strip() or line.startswith('#'):
-            continue
-        row = np.array([float(v) for v in line.split()])
-        if len(row) != 8 or not np.isfinite(row).all():
-            raise ValueError('Invalid trajectory row')
-        out.append((row[0], row[1:4], rot_to_quat(Rotation.from_quat(row[4:]).as_matrix().T)))
-    return out
+RPE_INTERVALS_S = (1., 5., 10.)
 
 
 def matched_points(ds, trajectory, t_start, tolerance=MATCH_TOLERANCE_S,
@@ -33,7 +16,7 @@ def matched_points(ds, trajectory, t_start, tolerance=MATCH_TOLERANCE_S,
     pairs = []
     for k, (t, _p, _q) in enumerate(kept):
         j = int(np.argmin(np.abs(gt.t - t)))
-        if abs(float(gt.t[j]) - t) <= tolerance:
+        if abs(float(gt.t[j]) - t) <= tolerance and (gt.valid is None or bool(gt.valid[j])):
             pairs.append((k, j))
     if len(pairs) < min_matched:
         return None, None, None, None, len(kept)
@@ -88,3 +71,46 @@ def ate(ds, trajectory, t_start, tolerance=MATCH_TOLERANCE_S, min_matched=MIN_MA
                 orientation_deg=float(np.sqrt(np.mean(np.square(residuals)))),
                 n_matched=est_p.shape[1], n_states=n_states,
                 conditioning=conditioning(ref_p), reason='')
+
+
+def _pairs(times, interval_s, tolerance):
+    t = np.asarray(times, float).reshape(-1)
+    out = []
+    for i, ti in enumerate(t):
+        target = ti + float(interval_s)
+        j = int(np.searchsorted(t, target - tolerance, side='left'))
+        if j < t.size and j != i and abs(t[j] - target) <= tolerance:
+            out.append((i, j))
+    return tuple(out)
+
+
+def rpe(ds, trajectory, t_start, intervals=RPE_INTERVALS_S, tolerance=MATCH_TOLERANCE_S):
+    est_p, ref_p, orientations, times, _n = matched_points(
+        ds, trajectory, t_start, tolerance, min_matched=2)
+    if est_p is None:
+        return {float(i): dict(position_m=None, orientation_deg=None, n_pairs=0,
+                               reason='fewer than two poses matched the reference')
+                for i in intervals}
+    est_q, ref_r = orientations
+    reliable = ds.groundtruth().orientation_reliable
+    out = {}
+    for interval_s in intervals:
+        pairs = _pairs(times, interval_s, tolerance)
+        if not pairs:
+            out[float(interval_s)] = dict(position_m=None, orientation_deg=None, n_pairs=0,
+                                          reason=f'no pair separated by {interval_s:.1f} s exists in this span')
+            continue
+        dp, dang = [], []
+        for i, j in pairs:
+            r_i, r_j = quat_to_rot(est_q[i]).T, quat_to_rot(est_q[j]).T
+            dp.append(float(np.linalg.norm(r_i.T @ (est_p[:, j] - est_p[:, i])
+                                           - ref_r[i].T @ (ref_p[:, j] - ref_p[:, i]))))
+            if reliable:
+                cos = (np.trace((r_i.T @ r_j).T @ (ref_r[i].T @ ref_r[j])) - 1.) / 2.
+                dang.append(np.degrees(np.arccos(np.clip(cos, -1., 1.))))
+        out[float(interval_s)] = dict(
+            position_m=float(np.sqrt(np.mean(np.square(dp)))),
+            orientation_deg=float(np.sqrt(np.mean(np.square(dang)))) if dang else None,
+            n_pairs=len(pairs),
+            reason='' if reliable else "this reference's orientation is documented as unreliable")
+    return out

@@ -116,18 +116,6 @@
   .facts b { color: var(--ink); }
   .note { color: var(--soft); font-size: 14.5px; margin-top: 16px; }
 
-  /* videos */
-  .tabs.small { margin: 0 0 14px 10px; }
-  .tabs.small button { font-size: 13px; padding: 6px 12px; }
-  .player { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius); overflow: hidden;
-            background: #0d1015; border: 1px solid var(--line); }
-  .player video { width: 100%; height: 100%; display: block; object-fit: contain; }
-  .rerun-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 18px; }
-  .rerun-bar .note { margin: 0; }
-  .stage.rerun { background: #0d1015; margin-top: 16px; }
-  .stage[hidden] { display: none; }
-  @media (max-width: 640px) { .tabs.small { margin-left: 0; } }
-
   /* figures and video */
   .media { margin-top: 26px; }
   .media img, .media video { width: 100%; display: block; border-radius: var(--radius); border: 1px solid var(--line);
@@ -160,7 +148,6 @@
   <div class="wrap">
     <a class="brand" href="#">DAVIO</a>
     <div class="links">
-      <a href="#videos">Videos</a>
       <a href="#maps">Maps</a>
       <a class="optional" href="#method">Method</a>
       <a class="optional" href="#results">Results</a>
@@ -184,39 +171,14 @@
       <span class="button muted" title="The paper is under review">Paper — soon</span>
     </div>
     <div class="teaser">
-      <video autoplay muted loop playsinline preload="metadata" poster="assets/videos/ori_open3d.jpg">
-        <source src="assets/videos/ori_open3d.mp4" type="video/mp4">
+      <video autoplay muted loop playsinline preload="metadata" poster="assets/grid_ori.jpg">
+        <source src="assets/grid_ori.mp4" type="video/mp4">
       </video>
       <p class="caption">ORI r01, a building interior. Top left, the camera; around it, the map
         DAVIO builds from those frames — all four views show the same moment.</p>
     </div>
   </div>
 </header>
-
-<section id="videos">
-  <div class="wrap">
-    <p class="eyebrow">Four datasets</p>
-    <h2>Watch it build</h2>
-    <p class="lead">One sequence from each kind of data: a drone in a Vicon room, a building walked with a
-      fisheye, a phone on a beach promenade, a handheld rig in a motion-capture room. Rendered offline with
-      Open3D, or replayed in Rerun as the run recorded it.</p>
-    <div class="tabs" id="videoTabs" role="tablist"></div>
-    <div class="tabs small" id="renderer" role="tablist">
-      <button role="tab" aria-selected="true" data-renderer="open3d">Open3D</button>
-      <button role="tab" aria-selected="false" data-renderer="rerun">Rerun</button>
-    </div>
-    <div class="player">
-      <video id="videoPlayer" controls muted loop playsinline preload="metadata"></video>
-    </div>
-    <div class="facts" id="videoFacts"></div>
-    <p class="note" id="videoNote"></p>
-    <div class="rerun-bar">
-      <button class="button" id="openRerun" type="button">Open this run in Rerun</button>
-      <span class="note" id="rerunNote">Scrub the run yourself: the viewer and the recording load only on click.</span>
-    </div>
-    <div class="stage rerun" id="rerunStage" hidden></div>
-  </div>
-</section>
 
 <section id="maps">
   <div class="wrap">
@@ -262,18 +224,18 @@
     <div>
       <p class="eyebrow">Your own data</p>
       <h2>It runs on a phone, uncalibrated.</h2>
-      <p class="lead">225 seconds along a beach promenade, recorded with a phone held in
+      <p class="lead">212 seconds along a beach promenade, recorded with a phone held in
         portrait: intrinsics from the lens spec, no camera–IMU calibration, placeholder IMU noise.</p>
       <ul class="points">
         <li>DAVIO's initializer and OpenVINS's online calibration recover the focal length and a
-          <b>16 ms</b> camera–IMU time offset while it runs.</li>
-        <li><b>195 m</b> walked with no jumps.</li>
+          <b>15 ms</b> camera–IMU time offset while it runs.</li>
+        <li><b>186 m</b> walked with no jumps, and under a metre of height drift.</li>
         <li>Sky gets a finite depth from the network; two settings keep it out of the map.</li>
       </ul>
     </div>
     <div class="media" style="margin-top:0">
-      <video controls muted loop playsinline preload="none" poster="assets/videos/beach_open3d.jpg">
-        <source src="assets/videos/beach_open3d.mp4" type="video/mp4">
+      <video controls muted loop playsinline preload="none" poster="assets/grid_beach.jpg">
+        <source src="assets/grid_beach.mp4" type="video/mp4">
       </video>
     </div>
   </div>
@@ -659,92 +621,6 @@ load(DATASETS[0]).catch(reportFailure);
 Promise.all(DATASETS.map(d => fetch(`assets/maps/${d.name}.json`).then(r => r.ok ? r.json() : null)))
   .then(metas => numbersTable(metas.filter(Boolean)))
   .catch(() => {});
-</script>
-<script type="module">
-// The video gallery: a tab per dataset, Open3D or Rerun, and the run's own numbers (assets/videos/<name>.json).
-const VIDEOS = ['euroc', 'ori', 'beach', 'tumvi'];
-const player = document.getElementById('videoPlayer');
-const videoTabs = document.getElementById('videoTabs');
-const videoFacts = document.getElementById('videoFacts');
-const state = { name: VIDEOS[0], renderer: 'open3d', facts: {} };
-
-function showVideo() {
-  const base = `assets/videos/${state.name}_${state.renderer}`;
-  player.poster = `${base}.jpg`;
-  player.src = `${base}.mp4`;
-  player.play().catch(() => {});
-  const f = state.facts[state.name] || {};
-  const bits = [];
-  if (f.duration_s) bits.push(`<span><b>${f.duration_s} s</b> of sensor time</span>`);
-  if (f.path_m) bits.push(`<span><b>${f.path_m} m</b> travelled</span>`);
-  if (f.submaps) bits.push(`<span><b>${f.submaps}</b> submaps</span>`);
-  if (f.loops) bits.push(`<span><b>${f.loops}</b> loop closures</span>`);
-  if (f.ate_final_m !== undefined) bits.push(`<span>ATE <b>${(f.ate_final_m * 100).toFixed(1)} cm</b></span>`);
-  if (f.f1_5cm !== undefined) bits.push(`<span>F-score at 5 cm <b>${f.f1_5cm.toFixed(2)}</b></span>`);
-  videoFacts.innerHTML = bits.join('');
-  document.getElementById('videoNote').textContent = [f.title, f.note].filter(Boolean).join(' · ');
-}
-
-function select(group, button) {
-  for (const other of group.children) other.setAttribute('aria-selected', String(other === button));
-}
-
-for (const button of document.querySelectorAll('[data-renderer]'))
-  button.addEventListener('click', () => {
-    select(button.parentElement, button);
-    state.renderer = button.dataset.renderer;
-    showVideo();
-  });
-
-Promise.all(VIDEOS.map(name => fetch(`assets/videos/${name}.json`).then(r => r.ok ? r.json() : {}).catch(() => ({}))))
-  .then(all => {
-    VIDEOS.forEach((name, i) => {
-      state.facts[name] = all[i];
-      const button = document.createElement('button');
-      button.textContent = all[i].title || name;
-      button.setAttribute('role', 'tab');
-      button.setAttribute('aria-selected', String(i === 0));
-      button.addEventListener('click', () => {
-        select(videoTabs, button);
-        state.name = name;
-        closeRerun();
-        showVideo();
-      });
-      videoTabs.appendChild(button);
-    });
-    showVideo();
-  });
-
-// Rerun's own viewer (about 30 MB of WebAssembly) and the run's recording load only when asked for.
-// unpkg, not jsDelivr: the package imports './re_viewer' with no extension, which only unpkg resolves.
-const RERUN = 'https://unpkg.com/@rerun-io/web-viewer@0.23.1/index.js';
-const rerunStage = document.getElementById('rerunStage');
-const rerunNote = document.getElementById('rerunNote');
-let viewer = null;
-
-async function openRerun() {
-  closeRerun();
-  rerunStage.hidden = false;
-  rerunNote.textContent = 'Loading the Rerun viewer…';
-  const { WebViewer } = await import(RERUN);
-  viewer = new WebViewer();
-  await viewer.start(new URL(`assets/rerun/${state.name}.rrd`, location.href).href, rerunStage,
-                     { hide_welcome_screen: true, width: '100%', height: '100%' });
-  rerunNote.textContent = 'Drag to orbit, scroll to zoom; the timeline at the bottom scrubs the run.';
-  rerunStage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
-function closeRerun() {
-  if (viewer) { viewer.stop(); viewer = null; }
-  rerunStage.replaceChildren();
-  rerunStage.hidden = true;
-  rerunNote.textContent = 'Scrub the run yourself: the viewer and the recording load only on click.';
-}
-
-document.getElementById('openRerun').addEventListener('click', () => openRerun().catch(error => {
-  rerunNote.textContent = `The Rerun viewer could not start: ${error.message || error}`;
-  console.error(error);
-}));
 </script>
 </body>
 </html>

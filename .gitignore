@@ -16,4 +16,3 @@ renders/
 config/custom/
 *.rrd
 data/*
-!website/assets/rerun/*.rrd

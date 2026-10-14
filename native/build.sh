@@ -2,7 +2,7 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT="$(cd "${HERE}/../src" && pwd)"
-# OpenVINS is built with ROS 2, so rclcpp must be on the CMake path.
+# The libraries are a ROS 2 build (ROS_AVAILABLE==2), so rclcpp must be on the CMake path.
 set +u; source "${ROS_SETUP:-/opt/ros/humble/setup.bash}"; set -u
 cmake -S "${HERE}" -B "${HERE}/build" \
       -DCMAKE_BUILD_TYPE=Release \

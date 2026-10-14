@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Stills and a turntable of a run's fused map (map.ply), rendered offscreen with Open3D on the host."""
 import argparse
 import json
 import math
@@ -266,7 +265,7 @@ def main(argv=None):
 
     ply = a.ply or (a.run / 'map.ply' if a.run else None)
     if ply is None or not Path(ply).is_file():
-        p.error('no fused cloud: pass --ply, or export one with `./davio map <run>`')
+        p.error('no fused cloud: pass --ply, or export one with `./davio export <run>`')
     try:
         import open3d as o3d
     except ImportError:
@@ -300,7 +299,7 @@ def main(argv=None):
     streams = []
     if a.odometry in ('map', 'both'):
         streams.append(('map', a.trajectory or (a.run and next(
-            (a.run / n for n in ('map_trajectory_final.tum', 'map_trajectory.tum',
+            (a.run / n for n in ('map_trajectory.tum', 'map_trajectory_final.tum',
                                  'trajectory.tum') if (a.run / n).is_file()), None))))
     if a.odometry in ('raw', 'both'):
         streams.append(('raw', (a.run / 'trajectory.tum') if a.run else None))
