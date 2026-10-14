@@ -1,0 +1,10 @@
+{
+ "title": "EuRoC V1_01",
+ "note": "Vicon room · drone · grey camera",
+ "duration_s": 146,
+ "path_m": 57.6,
+ "submaps": 92,
+ "loops": 5,
+ "ate_final_m": 0.0414,
+ "f1_5cm": 0.523
+}
