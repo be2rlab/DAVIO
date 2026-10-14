@@ -21,6 +21,7 @@ def evaluate(run, data_root, reference=None):
     run = Path(run)
     meta = json.loads((run / 'run.json').read_text())
     ds = open_dataset(meta['dataset'], data_root, meta['sequence'], reference)
+    scored = ds.reference_path is not None       # a phone session has none: described, not scored
     start, end = meta['interval_start'], meta['interval_end']
     streams = {name: metrics.read_trajectory(run / file) for name, file in STREAMS.items() if (run / file).is_file()}
     times = np.array([row[0] for row in streams['odometry']])
@@ -31,12 +32,12 @@ def evaluate(run, data_root, reference=None):
         dataset=meta['dataset'], sequence=meta['sequence'], state=meta['state'], rate=meta['rate'],
         # A gap in the output is not interpolated away: no pose, no coverage.
         coverage=float(np.minimum(np.diff(times), .1).sum() / (end - start)) if len(times) > 1 else 0.,
-        ate={name: metrics.ate(ds, rows, start) for name, rows in streams.items()},
+        ate={name: metrics.ate(ds, rows, start) for name, rows in streams.items()} if scored else {},
         windows=meta['windows'], loops_closed=meta['loops_closed'],
         pose_age_p50_s=meta['pose_age_p50_s'], pose_age_p95_s=meta['pose_age_p95_s'],
         map_age_p50_s=float(np.median(ages)) if ages else None,      # newest image of a window received -> window in the map
         map_age_p95_s=float(np.percentile(ages, 95)) if ages else None,
-        peak_gpu_gb=float(max(gpu)) if gpu else None, groundtruth=ds.reference_provenance())
+        peak_gpu_gb=float(max(gpu)) if gpu else None, groundtruth=ds.reference_provenance() if scored else None)
     (run / 'evaluation.json').write_text(json.dumps(json_safe(output), indent=2, allow_nan=False))
     return output
 

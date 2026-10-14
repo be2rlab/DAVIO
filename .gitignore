@@ -16,3 +16,4 @@ renders/
 config/custom/
 *.rrd
 data/*
+docs/*

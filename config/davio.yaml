@@ -8,6 +8,8 @@ shutdown_drain_s: 10.0             # at the end, how long the windows already su
 rigs:                              # the filter's configuration per dataset
   euroc: config/euroc/estimator_config.yaml
   ori: config/ori/estimator_config.yaml
+  custom: config/phone/estimator_config.yaml
+  tumvi: config/tumvi/estimator_config.yaml
 openvins:                          # written over the rig's estimator file
   verbosity: WARNING
   calib_cam_extrinsics: true

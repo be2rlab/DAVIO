@@ -7,24 +7,52 @@ score() {  # run directory
   DAVIO_GPUS=none in_image python3 scripts/score_trajectory.py --run "$1" --data "$data"
   DAVIO_GPUS=none in_image python3 scripts/score_map.py --run "$1" --data "$data" --force
 }
+view() {
+  local web="${DAVIO_WEB_PORT:-9090}" grpc="${DAVIO_GRPC_PORT:-9876}"
+  local args=(scripts/view_run.py --run "$1" --web-port "$web" --grpc-port "$grpc" "${@:2}")
+  if python3 -c 'import rerun, scipy; assert tuple(map(int, rerun.__version__.split(".")[:2])) >= (0, 23)' 2>/dev/null; then
+    exec python3 "${args[@]}"
+  fi
+  DAVIO_GPUS=none DAVIO_DOCKER_ARGS="-p 127.0.0.1:$web:$web -p 127.0.0.1:$grpc:$grpc" exec scripts/docker.sh python3 "${args[@]}"
+}
 case "${1:-}" in
   run)
     seq="${2:?usage: ./davio run SEQUENCE [options of scripts/run.py]}"; shift 2
-    dataset=euroc; out="runs/$seq"; rest=()
+    dataset=euroc; out="runs/$seq"; viz=; rest=()
     while [ $# -gt 0 ]; do
       case "$1" in
         --dataset) dataset="$2"; shift 2 ;;
         --out) out="$2"; shift 2 ;;
+        --viz) viz=1; shift ;;
         *) rest+=("$1"); shift ;;
       esac
     done
+    if [ -n "$viz" ]; then      # the viewer reads what the run writes, from beside it
+      [ ! -e "$out" ] || { echo "$out already exists; give the run another --out" >&2; exit 1; }
+      view "$out" --follow </dev/null &
+      viewer=$!
+      trap 'kill "$viewer" 2>/dev/null || true' EXIT
+    fi
     in_image python3 scripts/run.py --dataset "$dataset" --data "data/$dataset" --sequence "$seq" --out "$out" ${rest[@]+"${rest[@]}"}
     DAVIO_GPUS=none in_image python3 scripts/export_map.py --run "$out"
     score "$out"
+    if [ -n "$viz" ] && kill -0 "$viewer" 2>/dev/null; then
+      echo "The viewer still serves $out at http://localhost:${DAVIO_WEB_PORT:-9090}/?url=rerun%2Bhttp%3A%2F%2F127.0.0.1%3A${DAVIO_GRPC_PORT:-9876}%2Fproxy; interrupt to stop it."
+      wait "$viewer" || true
+    fi
     ;;
+  view)  view "${2:?usage: ./davio view RUN [options of scripts/view_run.py]}" "${@:3}" ;;
   map)   DAVIO_GPUS=none in_image python3 scripts/export_map.py --run "${2:?usage: ./davio map RUN}" "${@:3}" ;;
   score) score "${2:?usage: ./davio score RUN}" ;;
   test)  DAVIO_GPUS=none in_image python3 -m pytest -q "${@:2}" ;;
   shell) in_image ;;
-  *) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *) cat >&2 <<'USAGE'
+./davio run SEQUENCE [--dataset euroc|ori|custom|tumvi] [--out RUN] [--viz] [options of scripts/run.py]
+./davio view RUN [options of scripts/view_run.py]
+./davio map RUN [options of scripts/export_map.py]
+./davio score RUN
+./davio test [options of pytest]
+./davio shell
+USAGE
+     exit 1 ;;
 esac

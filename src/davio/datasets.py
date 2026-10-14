@@ -1,4 +1,4 @@
-"""EuRoC and ORI sequences: camera frames, IMU, calibration, and the reference trajectory.
+"""EuRoC, ORI, TUM-VI and phone sequences: camera frames, IMU, calibration, and the reference trajectory.
 The reference is read by the scorers only; nothing online touches it.
 """
 from collections import namedtuple
@@ -60,6 +60,15 @@ def sha256(path):
         for chunk in iter(lambda: stream.read(1 << 20), b''):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def rig_camera(name):
+    """The camera of a dataset's rig file (config/NAME) and its pose on the IMU (T_imu_cam)."""
+    cam = yaml.safe_load((ROOT / f'config/{name}/kalibr_imucam_chain.yaml').read_text().replace('%YAML:1.0', ''))['cam0']
+    fx, fy, cx, cy = cam['intrinsics']
+    camera = Camera(K=np.array([[fx, 0., cx], [0., fy, cy], [0., 0., 1.]]), D=np.asarray(cam['distortion_coeffs'], float),
+                    model=cam['distortion_model'], resolution=tuple(cam['resolution']))
+    return camera, np.asarray(cam['T_imu_cam'], float)
 
 
 class Sequence:
@@ -145,11 +154,7 @@ class Ori(Sequence):
         if not (root / 'conversion.json').is_file():
             raise FileNotFoundError(f'{root} lacks conversion.json; run scripts/convert_ori.py first')
         self.open(root, root / 'cam0/data', root / 'imu0/data.csv')
-        cam = yaml.safe_load((ROOT / 'config/ori/kalibr_imucam_chain.yaml').read_text().replace('%YAML:1.0', ''))['cam0']
-        fx, fy, cx, cy = cam['intrinsics']
-        self.camera = Camera(K=np.array([[fx, 0., cx], [0., fy, cy], [0., 0., 1.]]), D=np.asarray(cam['distortion_coeffs'], float),
-                             model=cam['distortion_model'], resolution=tuple(cam['resolution']))
-        T_ic = np.asarray(cam['T_imu_cam'], float)
+        self.camera, T_ic = rig_camera('ori')
         self.R_CtoI, self.p_IC = T_ic[:3, :3], T_ic[:3, 3]
         self.reference_variant = 'camera poses registered to the scan, carried to the body by the calibration'
         self.reference_path = next(self.seq_root.glob('*_gt')) / 'poses_gt.txt'
@@ -166,6 +171,57 @@ class Ori(Sequence):
         return self._reference
 
 
+class Custom(Sequence):
+    """A phone session from vi_recorder (vi_recorder/to_asl.py): colour JPEG frames and the phone's IMU, no reference.
+    The camera is the rig's (config/phone), placeholder intrinsics the filter refines while it runs."""
+    name = 'custom'
+    extension = '.jpg'
+
+    def __init__(self, root, seq):
+        root = Path(root) / seq / 'mav0'
+        self.open(root, root / 'cam0/data', root / 'imu0/data.csv')
+        self.seq = seq
+        self.camera, T_ic = rig_camera('phone')
+        self.R_CtoI, self.p_IC = T_ic[:3, :3], T_ic[:3, 3]
+        self.reference_variant, self.reference_path = None, None
+
+    def load_filter_image(self, stamp):
+        import cv2
+        return cv2.cvtColor(self.load_color_image(stamp), cv2.COLOR_RGB2GRAY)
+
+    def load_color_image(self, stamp):
+        return read_image(self.frames / f'{int(stamp)}.jpg', color=True)
+
+    def groundtruth(self):
+        raise LookupError(f'{self.seq} has no reference')
+
+
+class TumVi(Sequence):
+    """TUM-VI room sequences as exported for EuRoC at 512x512: grey 16-bit frames at 20 Hz from an equidistant
+    fisheye, the BMI160 at 200 Hz, and motion capture of the IMU."""
+    name = 'tumvi'
+
+    def __init__(self, root, seq):
+        root = Path(root) / seq / 'mav0'
+        self.open(root, root / 'cam0/data', root / 'imu0/data.csv')
+        self.seq = seq
+        self.camera, T_ic = rig_camera('tumvi')
+        self.R_CtoI, self.p_IC = T_ic[:3, :3], T_ic[:3, 3]
+        self.reference_variant = 'motion capture of the IMU'
+        self.reference_path = root / 'mocap0/data.csv'
+
+    def load_filter_image(self, stamp):
+        image = read_image(self.frames / f'{int(stamp)}.png')
+        return (image >> 8).astype(np.uint8) if image.dtype == np.uint16 else image
+
+    def groundtruth(self):
+        if self._reference is None:
+            table = np.loadtxt(self.reference_path, delimiter=',', comments='#', ndmin=2)
+            R = Rotation.from_quat(table[:, [5, 6, 7, 4]]).as_matrix()      # the file is w x y z
+            self._reference = Reference(t=table[:, 0] * 1e-9, p=table[:, 1:4], R=R)
+        return self._reference
+
+
 def open_dataset(name, root, seq, reference=None):
     """``reference`` (EuRoC only): 'dataset', the sequence's own file, or 'openvins', the corrected
     file OpenVINS distributes, which is the default."""
@@ -173,4 +229,8 @@ def open_dataset(name, root, seq, reference=None):
         return Euroc(root, seq, reference or 'openvins')
     if name == 'ori':
         return Ori(root, seq)
-    raise ValueError('dataset must be euroc or ori')
+    if name == 'custom':
+        return Custom(root, seq)
+    if name == 'tumvi':
+        return TumVi(root, seq)
+    raise ValueError('dataset must be euroc, ori, custom or tumvi')

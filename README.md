@@ -30,6 +30,26 @@ A run directory holds the trajectories (`trajectory.tum` from the filter, `map_t
 ./davio test
 ```
 
+## See it
+
+```bash
+./davio run V1_01_easy --viz                    # the run with a viewer beside it
+./davio view runs/V1_01_easy                    # a run, finished or still being written
+./davio view runs/V1_01_easy --save tour.rrd    # a file, to open with `rerun tour.rrd`
+```
+
+Open http://localhost:9090/?url=rerun%2Bhttp%3A%2F%2F127.0.0.1%3A9876%2Fproxy (the viewer prints it). Without the `url`
+part, or with its `+` unescaped, the page shows Rerun's welcome screen and no run. The viewer is [Rerun](https://rerun.io) 0.23: the host's when it has `rerun-sdk` (`pip install rerun-sdk==0.23.1`), the
+image's otherwise. It reads only what the run has written, so watching cannot change a run. On screen: the map's trajectory (cyan)
+over the filter's (orange), the camera, the dense submaps as the map places them (a loop closure moves them) on a 1 m floor
+grid, keyframes (white), loop closures (magenta), the newest image and its metric depth, the mapper's latency, scale and
+corrections per window, and a card with the run's progress and, once scored, its trajectory error and surface F-score. The map
+is coloured by height above the floor, shaded by the image, when the camera is grey, and in its own colours when it is not
+(`--color height|rgb`); `--background light` for a bright one. It is the map before the export-time correction
+(`./davio map RUN --no-correction`). `--frames centre` or a larger `--pixel-step` makes it
+lighter. From another machine, forward both ports: `ssh -L 9090:localhost:9090 -L 9876:localhost:9876 HOST`;
+`DAVIO_WEB_PORT` and `DAVIO_GRPC_PORT` move them.
+
 ## Scores
 
 `scripts/score_trajectory.py`: absolute trajectory error after a rigid fit, no scale fitted.
