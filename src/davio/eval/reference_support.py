@@ -20,7 +20,7 @@ def voxel_downsample(points, voxel):
     return points[np.sort(first)]
 
 
-def camera_track(ds, period_s, until=None):
+def camera_track(ds, period_s):
     gt = ds.groundtruth()
     body_camera = np.eye(4)
     body_camera[:3, :3] = np.asarray(ds.R_CtoI, float)
@@ -28,14 +28,10 @@ def camera_track(ds, period_s, until=None):
     times = np.asarray(gt.t, float)
     keep, last = [], -np.inf
     for i, t in enumerate(times):
-        if until is not None and t > until + 1e-9:
-            break
         if t - last >= period_s - 1e-9:
             keep.append(i)
             last = t
     keep = np.asarray(keep, int)
-    if gt.valid is not None:
-        keep = keep[np.asarray(gt.valid, bool)[keep]]
     world = np.repeat(np.eye(4)[None], len(keep), axis=0)
     world[:, :3, :3] = gt.R[keep]
     world[:, :3, 3] = gt.p[keep]
@@ -72,9 +68,9 @@ def _visible_against_reference(points, camera, K, shape, near, far, tolerance, d
 
 
 def build(ds, reference, reference_sha, K, shape, *, near=.15, far=20.,
-          period_s=.1, voxel=.01, tolerance=.03, dilate=5, until=None):
+          period_s=.1, voxel=.01, tolerance=.03, dilate=5):
     points = voxel_downsample(np.asarray(reference, float), voxel)
-    cameras, times = camera_track(ds, period_s, until)
+    cameras, times = camera_track(ds, period_s)
     centres = cameras[:, :3, 3]
     crop = cKDTree(centres).query(points, distance_upper_bound=far)[0] < far
     visible = np.zeros(len(points), bool)
@@ -86,9 +82,8 @@ def build(ds, reference, reference_sha, K, shape, *, near=.15, far=20.,
     provenance = dict(
         kind='ground-truth camera support, frozen per sequence',
         reference_sha256=reference_sha, reference_points=int(len(points)),
-        groundtruth=ds.groundtruth_provenance() if hasattr(ds, 'groundtruth_provenance') else None,
+        groundtruth=ds.reference_provenance(),
         cameras=int(len(cameras)), support_period_s=float(period_s),
-        **({'until': float(until)} if until is not None else {}),
         first_time=float(times[0]) if len(times) else None,
         last_time=float(times[-1]) if len(times) else None,
         voxel_m=float(voxel), near_m=float(near), far_m=float(far),
@@ -113,14 +108,13 @@ def load_or_build(cache_dir, ds, reference, reference_sha, K, shape, **kwargs):
                  support_period_s=float(kwargs.get('period_s', .1)),
                  occlusion_tolerance_m=float(kwargs.get('tolerance', .03)),
                  occlusion_dilate_px=int(kwargs.get('dilate', 5)),
-                 **({'until': float(kwargs['until'])} if kwargs.get('until') is not None else {}),
                  # Part of the cache identity: a changed algorithm must not reuse an old mask.
                  algorithm_version=2,
                  image_shape=[int(shape[0]), int(shape[1])],
                  intrinsics=np.asarray(K, float).tolist(),
-                 groundtruth=ds.groundtruth_provenance() if hasattr(ds, 'groundtruth_provenance') else None)
+                 groundtruth=ds.reference_provenance())
     key = _digest(probe)[:16]
-    path = Path(cache_dir) / f'{getattr(ds, "seq", "sequence")}_{key}.npz'
+    path = Path(cache_dir) / f'{ds.seq}_{key}.npz'
     if path.is_file():
         with np.load(path, allow_pickle=False) as data:
             return (data['points'], data['crop'], data['visible'],

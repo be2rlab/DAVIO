@@ -26,6 +26,6 @@ target_include_directories(openvins_ext PRIVATE
 target_link_libraries(openvins_ext PRIVATE ${OV_MSCKF_LIB} ${OV_CORE_LIB}
     -Wl,--no-as-needed ${OV_INIT_LIB} -Wl,--as-needed ${OpenCV_LIBS} rclcpp::rclcpp)
 
-# So the imported module finds the colcon-built libraries without sourcing the workspace.
+set(OV_FROM_MODULE "$ORIGIN/../thirdparty/open_vins/install")
 set_target_properties(openvins_ext PROPERTIES
-    BUILD_RPATH "${OV_INSTALL}/ov_msckf/lib;${OV_INSTALL}/ov_core/lib;${OV_INSTALL}/ov_init/lib")
+    BUILD_RPATH "${OV_FROM_MODULE}/ov_msckf/lib;${OV_FROM_MODULE}/ov_core/lib;${OV_FROM_MODULE}/ov_init/lib")
