@@ -1,0 +1,49 @@
+FROM nvidia/cuda:12.6.3-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8
+SHELL ["/bin/bash", "-c"]
+
+# ROS 2 Humble plus the C++ toolchain OpenVINS needs (Eigen, OpenCV, Ceres, SuiteSparse, Boost).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      curl gnupg2 lsb-release software-properties-common ca-certificates && \
+    curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+      -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" \
+      > /etc/apt/sources.list.d/ros2.list && \
+    apt-get update && apt-get install -y --no-install-recommends \
+      build-essential cmake git unzip \
+      libeigen3-dev libopencv-dev libceres-dev libsuitesparse-dev libboost-all-dev \
+      python3-pip python3-colcon-common-extensions \
+      ros-humble-ros-base ros-humble-cv-bridge ros-humble-image-transport && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --no-cache-dir -U pip setuptools wheel
+
+# numpy is pinned below 2 for gtsam 4.2 and the pinned OpenCV wheel.
+RUN pip3 install --no-cache-dir \
+      "numpy<2" \
+      "opencv-python-headless==4.9.0.80" \
+      imageio \
+      "gtsam==4.2" \
+      "pybind11==2.13.6" \
+      "pytest~=7.4" \
+      "rerun-sdk==0.23.1"
+
+# Torch must match the CUDA in this image; DA3 and its support stack follow.
+RUN pip3 install --no-cache-dir \
+      torch==2.13.0 torchvision==0.28.0 \
+      --index-url https://download.pytorch.org/whl/cu126 && \
+    pip3 install --no-cache-dir \
+      "numpy<2" huggingface_hub einops omegaconf safetensors "pillow" \
+      pycolmap "moviepy==1.0.3" trimesh plyfile tqdm \
+      addict matplotlib scipy evo
+
+ENV PYTHONPATH=/workspace/src:/workspace/thirdparty/Depth-Anything-3/src
+ENV HF_HOME=/workspace/thirdparty/da3_weights/.hf_home
+
+RUN echo 'source /opt/ros/humble/setup.bash' >> /etc/bash.bashrc && \
+    echo '[ -f /workspace/thirdparty/open_vins/install/setup.bash ] && source /workspace/thirdparty/open_vins/install/setup.bash' \
+      >> /etc/bash.bashrc
+
+WORKDIR /workspace
+CMD ["bash"]

@@ -1,0 +1,134 @@
+%YAML:1.0
+verbosity: "WARNING"
+use_fej: true
+integration: "rk4"
+use_stereo: false
+max_cameras: 1
+use_imuavg: true
+use_rk4int: true
+
+calib_cam_extrinsics: true      # released extrinsics are a good prior; the filter refines them
+calib_cam_intrinsics: false     # the release ships rectified imagery and its own intrinsics
+calib_cam_timeoffset: false     # the release records td 0.0 and estimate_td off
+calib_imu_intrinsics: false
+calib_imu_g_sensitivity: false
+
+max_clones: 11
+max_slam: 50
+max_slam_in_update: 25
+max_msckf_in_update: 40
+dt_slam_delay: 1
+
+gravity_mag: 9.81               # g_norm from the release's struct_core_v2.yaml
+
+feat_rep_msckf: "GLOBAL_3D"
+feat_rep_slam: "ANCHORED_MSCKF_INVERSE_DEPTH"
+feat_rep_aruco: "ANCHORED_MSCKF_INVERSE_DEPTH"
+
+try_zupt: false
+zupt_chi2_multipler: 0
+zupt_max_velocity: 0.1
+zupt_noise_multiplier: 10
+zupt_max_disparity: 0.5
+zupt_only_at_beginning: false
+
+init_window_time: 2.0
+init_imu_thresh: 1.5
+init_max_disparity: 10.0
+init_max_features: 50
+init_window_offset: 0.01
+init_grav_opt_max_iter: 100
+init_grav_opt_init_lambda: 100
+init_grav_opt_converge_thres: 1e-6
+init_grav_opt_lambda_decay: 0.2
+init_grav_min_feat: 10
+
+init_prior_q: 0.1
+init_prior_p: 0.0
+init_prior_v: 1.0
+init_prior_bg: 0.01
+init_prior_ba: 0.05
+init_prior_t: 0.001
+init_prior_qc: 0.001
+init_prior_pc: 0.001
+init_prior_fc: 0.01
+init_prior_dc1: 0.01
+init_prior_dc2: 1e-5
+
+init_use_fej: false
+init_max_reproj: 3.0
+init_ba_dx_converge_thres: 1e-6
+init_ba_res_converge_thres: 1e-4
+init_min_feat: 20
+init_max_feat: 50
+init_ba_huber_th: 1.0
+
+step_debug: false
+optimizer_debug: false
+eigenvector_debug: false
+residual_debug: false
+dof: 1
+
+record_init_pose: false
+record_init_timing: false
+init_poses_log_file_path: /tmp/init_window_poses.txt
+init_metadata_log_file_path: /tmp/init_window_timing.txt
+
+use_bg_estimator: true
+init_dyn_use: true              # handheld start: no stationary period to rely on
+init_dyn_num_pose: 6
+init_dyn_min_deg: 10.0
+init_dyn_bias_g: [ 0.0, 0.0, 0.0 ]
+init_dyn_bias_a: [ 0.0, 0.0, 0.0 ]
+init_dyn_mle_max_iter: 50
+init_dyn_mle_max_time: 0.05
+init_dyn_mle_max_threads: 6
+init_dyn_mle_opt_calib: false
+init_dyn_min_rec_cond: 1e-12
+init_dyn_inflation_ori: 10.0
+init_dyn_inflation_vel: 100.0
+init_dyn_inflation_bg: 10.0
+init_dyn_inflation_ba: 100.0
+
+record_timing_information: false
+record_timing_filepath: "/tmp/traj_timing.txt"
+save_total_state: false
+filepath_est: "/tmp/ov_estimate.txt"
+filepath_std: "/tmp/ov_estimate_std.txt"
+filepath_gt: "/tmp/ov_groundtruth.txt"
+
+use_klt: true
+num_pts: 200
+fast_threshold: 30
+grid_x: 5
+grid_y: 5
+min_px_dist: 15
+ransac_th: 2.0
+knn_ratio: 0.70
+track_frequency: 31.0           # one above the ~30 fps stream
+downsample_cameras: false
+num_opencv_threads: 4
+histogram_method: "HISTOGRAM"
+
+use_aruco: false
+num_aruco: 1024
+downsize_aruco: true
+
+fi_refine_features: false
+fi_min_dist: 0.2
+fi_max_dist: 20.0
+fi_max_baseline: 200
+fi_max_cond_number: 1000000
+
+up_msckf_sigma_px: 1
+up_msckf_chi2_multipler: 1
+up_slam_sigma_px: 1
+init_slam_chi2_multipler: 1
+up_slam_chi2_multipler: 1
+up_aruco_sigma_px: 1
+up_aruco_chi2_multipler: 1
+
+use_mask: false
+
+relative_config_imu: "kalibr_imu_chain.yaml"
+relative_config_imucam: "kalibr_imucam_chain.yaml"

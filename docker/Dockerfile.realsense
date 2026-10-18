@@ -1,0 +1,6 @@
+ARG BASE=davio/dense-gpu:latest
+FROM ${BASE}
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libusb-1.0-0 udev && \
+    rm -rf /var/lib/apt/lists/*
+RUN python3 -m pip install --no-cache-dir pyrealsense2
